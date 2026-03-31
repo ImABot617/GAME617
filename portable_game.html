@@ -1,0 +1,4183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AoE Boss Rush</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            border: 4px solid #333;
+            border-radius: 8px;
+        }
+        canvas {
+            display: block;
+            background-color: #222;
+            max-width: 95vw;
+            max-height: 95vh;
+            object-fit: contain;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .health-bar-container {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #555;
+            border-radius: 4px;
+            height: 20px;
+            position: relative;
+            margin-bottom: 5px;
+        }
+        .health-bar-fill {
+            height: 100%;
+            background: #e74c3c;
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+        .health-bar-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 20px;
+            text-shadow: 1px 1px 2px black;
+        }
+        #player-health .health-bar-fill { background: #2ecc71; }
+        
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        h1 { margin: 0 0 10px 0; color: #fff; font-size: 36px; }
+        p { margin: 0 0 20px 0; color: #ccc; text-align: center; max-width: 400px; }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2980b9; }
+        .hidden { display: none !important; }
+
+        #upgrade-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 10;
+        }
+        .upgrade-options {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .upgrade-card {
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            border: 2px solid #34495e;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .upgrade-card:hover {
+            transform: scale(1.05);
+            background: #34495e;
+            border-color: #f1c40f;
+        }
+        .upgrade-card h3 { margin: 0 0 10px 0; color: #f1c40f; }
+
+        .overlay-panel {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            pointer-events: auto; z-index: 15;
+        }
+        #fake-ad {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 320px; height: 250px; background: white; color: black;
+            border: 4px solid #e74c3c; z-index: 200; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            font-family: sans-serif; box-shadow: 0 0 30px rgba(0,0,0,1);
+        }
+        #close-ad {
+            position: absolute; top: 0; right: 0; background: #e74c3c; color: white;
+            border: none; padding: 5px 10px; font-weight: bold; cursor: pointer;
+        }
+        #toast {
+            position: absolute; bottom: 20px; right: 20px; background: #2ecc71;
+            color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 300; transition: opacity 0.5s;
+        }
+        .achiev-item { background: #34495e; padding: 10px; margin: 5px 0; width: 300px; border-left: 5px solid #7f8c8d; text-align: left; cursor: pointer; transition: background 0.2s; }
+        .achiev-item:hover { background: #3e566b; }
+        .achiev-item.unlocked { border-left-color: #f1c40f; }
+        .achiev-item h4 { margin: 0 0 5px 0; color: #fff; }
+        .achiev-item p { margin: 0; font-size: 12px; color: #ccc; }
+        
+        #achiev-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 280px; background: #2c3e50; color: #eee;
+            border: 2px solid #f1c40f; border-radius: 8px; z-index: 400; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            padding: 20px; box-shadow: 0 0 30px rgba(0,0,0,1);
+        }
+        #achiev-popup h3 { margin: 0 0 10px 0; color: #f1c40f; }
+        #close-achiev-popup {
+            margin-top: 15px; background: #e74c3c; color: white;
+            border: none; padding: 5px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;
+        }
+        #close-achiev-popup:hover { background: #c0392b; }
+
+        /* RPG Dialogue Box Styles */
+        #dialogue-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            background: rgba(0, 0, 0, 0.85);
+            border: 3px solid #fff;
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 250;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+        }
+        #dialogue-speaker {
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #dialogue-text {
+            font-size: 18px;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            margin-bottom: 10px;
+        }
+        #dialogue-prompt {
+            align-self: flex-end;
+            font-size: 12px;
+            color: #aaa;
+            animation: pulse 1s infinite;
+        }
+
+        /* System Glitch Password Modal */
+        #password-modal {
+            z-index: 500;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes rainbow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        #bonus-btn {
+            background: linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+            background-size: 200% 200%;
+            animation: rainbow 3s ease infinite;
+            color: white; border: 2px solid white; text-shadow: 1px 1px 2px black;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+    <div id="ui-layer">
+
+        <div id="boss-health" class="health-bar-container hidden">
+            <div id="boss-health-fill" class="health-bar-fill"></div>
+            <div id="boss-health-text" class="health-bar-text">Boss Name</div>
+        </div>
+        <div style="flex-grow:1"></div>
+        <div id="player-health" class="health-bar-container">
+            <div id="player-health-fill" class="health-bar-fill"></div>
+            <div class="health-bar-text">Player HP</div>
+        </div>
+    </div>
+    
+    <div id="overlay" class="overlay-panel">
+        <h1 id="overlay-title">AoE Boss Rush</h1>
+        <p id="overlay-desc">WASD to Move. Left-Click to Shoot. Right-Click to Melee.<br>Spacebar to Dash. Dodge the red warning zones!</p>
+        <p style="margin: 0 0 15px 0; color: #f1c40f; font-weight: bold; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Act Completions: <span id="comp-count">0</span></p>
+        <button id="start-btn" style="margin-bottom: 10px;">Start Act</button>
+        <button id="bonus-btn" class="hidden">Face True Admin</button>
+        <button id="achievements-btn">Achievements</button>
+        
+        <!-- SAVE / LOAD BUTTONS -->
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button id="save-btn" style="font-size: 14px; background: #27ae60;">Save Data</button>
+            <label for="load-file" style="font-size: 14px; background: #8e44ad; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; text-transform: uppercase;">Load Data</label>
+            <input type="file" id="load-file" accept=".json" class="hidden">
+        </div>
+    </div>
+
+    <!-- Secret Dev Buttons -->
+    <div id="bug-toggle" style="position: absolute; bottom: 5px; left: 5px; opacity: 0.05; cursor: pointer; color: #fff; font-size: 10px; z-index: 1000;">.sys_bug</div>
+
+    <div id="achievements-screen" class="overlay-panel hidden">
+        <h1>Achievements</h1>
+        <div id="achievements-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+        <button id="back-menu-btn">Back to Menu</button>
+    </div>
+
+    <div id="achiev-popup" class="hidden">
+        <h3 id="achiev-popup-title">Title</h3>
+        <p id="achiev-popup-desc">Description</p>
+        <button id="close-achiev-popup">Close</button>
+    </div>
+
+    <div id="fake-ad" class="hidden">
+        <button id="close-ad">X</button>
+        <h2 style="color: red; margin-top: 10px;">WARNING!</h2>
+        <p style="color: black;">Your computer has a VIRUS!<br><br>Click below to download Anti-Virus.</p>
+        <button style="background: #2ecc71; color: white; padding: 10px 20px; border: none; font-size: 16px; cursor: pointer; animation: pulse 1s infinite;">DOWNLOAD NOW</button>
+    </div>
+
+    <div id="toast" class="hidden">Achievement Unlocked!</div>
+
+    <div id="upgrade-screen" class="hidden">
+        <h1>Room Cleared!</h1>
+        <p>Choose your reward:</p>
+        <div class="upgrade-options">
+            <!-- Dynamically populated by JS -->
+        </div>
+    </div>
+
+    <!-- System Glitch Password Modal -->
+    <div id="password-modal" class="overlay-panel hidden">
+        <div style="background: #2c3e50; padding: 30px; border: 2px solid #e74c3c; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(231, 76, 60, 0.5);">
+            <h3 style="color: #e74c3c; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;">System Override</h3>
+            <p style="margin-bottom: 20px; color: #ccc;">All terminals bypassed. Enter Authorization Code:</p>
+            <input type="text" id="glitch-password" maxlength="4" style="padding: 10px; font-size: 24px; font-weight: bold; margin-bottom: 20px; width: 120px; text-align: center; background: #111; color: #00ff00; border: 1px solid #e74c3c; outline: none; letter-spacing: 5px;"><br>
+            <button id="submit-password">Hack System</button>
+            <button id="cancel-password" style="background: #7f8c8d; margin-left: 10px;">Abort</button>
+        </div>
+    </div>
+
+    <!-- RPG Dialogue Box -->
+    <div id="dialogue-container" class="hidden">
+        <div id="dialogue-speaker">Speaker</div>
+        <div id="dialogue-text">Dialogue text goes here...</div>
+        <div id="dialogue-prompt">Press SPACE or CLICK to continue</div>
+    </div>
+</div>
+
+<script>
+let act1Completions = 0;
+
+/**
+ * Math and Collision Utility Functions
+ */
+const MathUtils = {
+    dist: (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2),
+    
+    // Circle vs Rectangle collision
+    circleRectCollide: (cx, cy, cr, rx, ry, rw, rh) => {
+        let testX = cx;
+        let testY = cy;
+        if (cx < rx) testX = rx; else if (cx > rx + rw) testX = rx + rw;
+        if (cy < ry) testY = ry; else if (cy > ry + rh) testY = ry + rh;
+        let distX = cx - testX;
+        let distY = cy - testY;
+        return (distX * distX + distY * distY) <= (cr * cr);
+    },
+
+    // Circle vs Line Segment (with width, acts as a rotated rectangle/capsule)
+    circleLineCollide: (cx, cy, cr, x1, y1, x2, y2, width) => {
+        const L2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (L2 === 0) return MathUtils.dist(cx, cy, x1, y1) <= cr;
+        let t = ((cx - x1) * (x2 - x1) + (cy - y1) * (y2 - y1)) / L2;
+        t = Math.max(0, Math.min(1, t));
+        const projX = x1 + t * (x2 - x1);
+        const projY = y1 + t * (y2 - y1);
+        return MathUtils.dist(cx, cy, projX, projY) <= (cr + width / 2);
+    },
+
+    // Circle vs Ring collision
+    circleRingCollide: (cx, cy, cr, rx, ry, innerR, outerR) => {
+        const d = MathUtils.dist(cx, cy, rx, ry);
+        return (d + cr >= innerR && d - cr <= outerR);
+    }
+};
+
+/**
+ * Particle System Class
+ */
+class Particle {
+    constructor(x, y, color, speed, life, size) {
+        this.x = x; 
+        this.y = y;
+        const angle = Math.random() * Math.PI * 2;
+        const v = Math.random() * speed;
+        this.vx = Math.cos(angle) * v;
+        this.vy = Math.sin(angle) * v;
+        this.color = color;
+        this.maxLife = life;
+        this.life = life;
+        this.size = size;
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+        return this.life > 0; // Return false if dead
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+/**
+ * Minions for Tutorial
+ */
+class Minion {
+    constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type;
+        this.r = type === 'big' ? 30 : 15;
+        this.hp = type === 'big' ? 100 : 30;
+        this.speed = type === 'big' ? 50 : 110;
+        this.color = type === 'big' ? '#8e44ad' : '#e74c3c';
+        this.active = false;
+        this.hitCooldown = 0;
+    }
+    update(dt, player) {
+        if (!this.active || this.hp <= 0) return;
+        if (this.hitCooldown > 0) this.hitCooldown -= dt;
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(angle) * this.speed * dt;
+        this.y += Math.sin(angle) * this.speed * dt;
+
+        if (MathUtils.dist(this.x, this.y, player.x, player.y) < this.r + player.radius) {
+            if (this.hitCooldown <= 0) {
+                player.takeDamage(10, 'minion');
+                this.hitCooldown = 0.5;
+            }
+        }
+    }
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+    }
+}
+
+/**
+ * Game Core
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let ROOM_SIZE = 600;
+let GRID_CELL_SIZE = 20;
+
+function setRoomSize(size) {
+    ROOM_SIZE = size;
+    GRID_CELL_SIZE = ROOM_SIZE / 30;
+    canvas.width = ROOM_SIZE;
+    canvas.height = ROOM_SIZE;
+}
+
+// Input State
+const keys = { w: false, a: false, s: false, d: false, ' ': false };
+const mouse = { x: 0, y: 0, down: false, rightDown: false };
+
+// Globals
+let game;
+
+// Glitch System State
+const glitchCorners = { TL: [], TR: [], BL: [], BR: [] };
+const glitchUnlocked = { TL: false, TR: false, BL: false, BR: false };
+
+function checkGlitchCorners(x, y, roomSize) {
+    if (window.stackBugEnabled) return; // Already enabled
+    if (game && game.isGlitchModalOpen) return;
+
+    const cornerSize = 70; // Pixel size of the corner hitboxes
+    const now = performance.now();
+    let cornerHit = null;
+
+    if (x < cornerSize && y < cornerSize) cornerHit = 'TL';
+    else if (x > roomSize - cornerSize && y < cornerSize) cornerHit = 'TR';
+    else if (x < cornerSize && y > roomSize - cornerSize) cornerHit = 'BL';
+    else if (x > roomSize - cornerSize && y > roomSize - cornerSize) cornerHit = 'BR';
+
+    if (cornerHit) {
+        glitchCorners[cornerHit].push(now);
+        // Only keep clicks from the last 1000ms (1 second)
+        glitchCorners[cornerHit] = glitchCorners[cornerHit].filter(t => now - t <= 1000);
+
+        // If 10 Clicks per second achieved in this corner
+        if (glitchCorners[cornerHit].length >= 10 && !glitchUnlocked[cornerHit]) {
+            glitchUnlocked[cornerHit] = true;
+            
+            const toast = document.getElementById('toast');
+            toast.innerText = `Terminal [${cornerHit}] Bypassed...`;
+            toast.style.background = "#f39c12";
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 1500);
+
+            // Check if all 4 corners are unlocked
+            if (glitchUnlocked.TL && glitchUnlocked.TR && glitchUnlocked.BL && glitchUnlocked.BR) {
+                if (game) game.isGlitchModalOpen = true;
+                document.getElementById('password-modal').classList.remove('hidden');
+                document.getElementById('glitch-password').value = '';
+                setTimeout(() => document.getElementById('glitch-password').focus(), 50);
+            }
+        }
+    }
+}
+
+// Intercept inputs for the dialogue box system
+window.addEventListener('mousedown', e => {
+    if (game && game.dialogueActive) {
+        game.advanceDialogue();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}, true); // Capture phase to prevent firing immediately
+
+window.addEventListener('keydown', e => { 
+    if(e.key === ' ') {
+        if (game && game.dialogueActive) {
+            game.advanceDialogue();
+            e.preventDefault();
+            e.stopPropagation();
+        } else {
+            keys[' '] = true; 
+        }
+    }
+    else if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; 
+}, true);
+
+window.addEventListener('keyup', e => { 
+    if(e.key === ' ') keys[' '] = false; 
+    else if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; 
+});
+canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('mousedown', e => {
+    if (game && game.dialogueActive) return; // Ignore if in dialogue
+    if (game && game.isGlitchModalOpen) return; // Ignore if in password modal
+    if (e.button === 0) mouse.down = true;
+    else if (e.button === 2) mouse.rightDown = true;
+    
+    // Check glitch activation logic
+    if (game) checkGlitchCorners(mouse.x, mouse.y, ROOM_SIZE);
+});
+canvas.addEventListener('mouseup', e => {
+    if (e.button === 0) mouse.down = false;
+    else if (e.button === 2) mouse.rightDown = false;
+});
+// Prevent context menu on right click
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+/**
+ * Achievements System
+ */
+const achievements = {
+    first_blood: { title: "First Blood", desc: "The journey begins. Vanquish the Mecha Sentinel.", unlocked: false },
+    hacker: { title: "Hacker", desc: "Find the hidden backdoor. Some rules are meant to be broken...", unlocked: false },
+    ad_blocker: { title: "Ad Blocker", desc: "Survive the system override and dismiss the digital distraction.", unlocked: false },
+    god_slayer: { title: "God Slayer", desc: "Delete the system's architect. Conquer The Admin's ultimate form.", unlocked: false },
+    admins_vanguard: { title: "The Admin's Vanguard", desc: "Attain absolute perfection. Clear the entire simulation without a single scratch, relying only on your pure, un-altered skill.", unlocked: false },
+    dumber_than_a_rock: { title: "Dumber Than a Rock", desc: "Get beaten to a pulp by the Ancient Golem.", unlocked: false },
+    wall_hugger: { title: "Wall Hugger", desc: "Meet a crushing end by dying inside a spawned wall.", unlocked: false },
+    spiked: { title: "Spiked", desc: "Impale yourself on the bamboo forest spikes.", unlocked: false },
+    found_a_dollar: { title: "Spare Change", desc: "You found a hidden dollar bill in the Admin's server room. Don't spend it all in one place.", unlocked: false },
+    true_god_slayer: { title: "True God Slayer", desc: "You achieved the impossible. Defeated the True Admin in Awakened mode.", unlocked: false }
+};
+
+function unlockAchievement(id) {
+    if (!achievements[id].unlocked) {
+        achievements[id].unlocked = true;
+        const toast = document.getElementById('toast');
+        toast.innerText = "🏆 Achievement Unlocked: " + achievements[id].title;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 3000);
+        renderAchievements();
+        
+        if (id === 'god_slayer') {
+            document.getElementById('bonus-btn').classList.remove('hidden');
+        }
+    }
+}
+
+function renderAchievements() {
+    const list = document.getElementById('achievements-list');
+    list.innerHTML = '';
+    Object.values(achievements).forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'achiev-item ' + (a.unlocked ? 'unlocked' : '');
+        div.innerHTML = `<h4>${a.unlocked ? '🏆 ' : '🔒 '}${a.title}</h4><p style="font-size:10px; color:#aaa;">Click for details</p>`;
+        div.onclick = () => {
+            document.getElementById('achiev-popup-title').innerText = a.unlocked ? '🏆 ' + a.title : '🔒 Locked Achievement';
+            document.getElementById('achiev-popup-desc').innerText = a.unlocked ? a.desc : 'Keep playing to discover this secret...';
+            document.getElementById('achiev-popup').classList.remove('hidden');
+        };
+        list.appendChild(div);
+    });
+}
+
+/**
+ * Telegraph Class (The Red AoE zones)
+ */
+class Telegraph {
+    constructor(type, params, duration, damage, onResolve = null, sprite = null, source = null) {
+        this.type = type; // 'circle', 'rect', 'line', 'ring'
+        this.params = params; // depends on type
+        this.duration = duration; // in seconds
+        this.timer = 0;
+        this.damage = damage;
+        this.onResolve = onResolve;
+        this.resolved = false;
+        this.flashTimer = 0; // For visual flash upon hitting
+        this.sprite = sprite; // Emoji icon for the center
+        this.source = source; // String identifier for damage source
+    }
+
+    update(dt, player) {
+        if (this.resolved) {
+            this.flashTimer -= dt;
+            return this.flashTimer <= 0; // Remove if flash is done
+        }
+
+        this.timer += dt;
+        if (this.timer >= this.duration) {
+            this.resolve(player);
+            return false; // Keep alive slightly longer for flash
+        }
+        return false;
+    }
+
+    resolve(player) {
+        this.resolved = true;
+        this.flashTimer = 0.15; // Flash for 150ms
+
+        let hit = false;
+        const { x, y } = player;
+        const r = player.radius;
+
+        // Check hit based on shape
+        if (this.type === 'circle') {
+            hit = MathUtils.dist(x, y, this.params.x, this.params.y) <= (r + this.params.r);
+        } else if (this.type === 'rect') {
+            hit = MathUtils.circleRectCollide(x, y, r, this.params.x, this.params.y, this.params.w, this.params.h);
+        } else if (this.type === 'line') {
+            hit = MathUtils.circleLineCollide(x, y, r, this.params.x1, this.params.y1, this.params.x2, this.params.y2, this.params.w);
+        } else if (this.type === 'ring') {
+            hit = MathUtils.circleRingCollide(x, y, r, this.params.x, this.params.y, this.params.innerR, this.params.outerR);
+        }
+
+        if (hit) {
+            player.takeDamage(this.damage, this.source);
+        }
+
+        if (this.onResolve) {
+            this.onResolve();
+        }
+    }
+
+    draw(ctx) {
+        if (this.resolved) {
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.8)'; // Solid red flash
+        } else {
+            // Pulsing effect
+            const alpha = 0.2 + (Math.sin(this.timer * 10) * 0.1);
+            ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+            ctx.lineWidth = 2;
+        }
+
+        ctx.beginPath();
+        let centerX = 0, centerY = 0;
+        
+        if (this.type === 'circle') {
+            ctx.arc(this.params.x, this.params.y, this.params.r, 0, Math.PI * 2);
+            ctx.fill();
+            if(!this.resolved) ctx.stroke();
+            centerX = this.params.x; centerY = this.params.y;
+        } else if (this.type === 'rect') {
+            ctx.fillRect(this.params.x, this.params.y, this.params.w, this.params.h);
+            if(!this.resolved) ctx.strokeRect(this.params.x, this.params.y, this.params.w, this.params.h);
+            centerX = this.params.x + this.params.w/2; centerY = this.params.y + this.params.h/2;
+        } else if (this.type === 'line') {
+            // Draw a thick line (capsule)
+            ctx.lineCap = 'round';
+            ctx.lineWidth = this.params.w;
+            ctx.strokeStyle = this.resolved ? 'rgba(255, 0, 0, 0.8)' : `rgba(255, 50, 50, ${0.3})`;
+            ctx.moveTo(this.params.x1, this.params.y1);
+            ctx.lineTo(this.params.x2, this.params.y2);
+            ctx.stroke();
+            // Inner core
+            if(!this.resolved) {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+                ctx.stroke();
+            }
+            centerX = (this.params.x1 + this.params.x2)/2; centerY = (this.params.y1 + this.params.y2)/2;
+        } else if (this.type === 'ring') {
+            ctx.arc(this.params.x, this.params.y, this.params.outerR, 0, Math.PI * 2);
+            ctx.arc(this.params.x, this.params.y, this.params.innerR, 0, Math.PI * 2, true); // Anti-clockwise for hole
+            ctx.fill();
+            if(!this.resolved) {
+                ctx.beginPath(); ctx.arc(this.params.x, this.params.y, this.params.outerR, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(this.params.x, this.params.y, this.params.innerR, 0, Math.PI*2); ctx.stroke();
+            }
+            centerX = this.params.x; centerY = this.params.y - (this.params.innerR + this.params.outerR)/2;
+        }
+
+        // Draw Sprite inside the Telegraph
+        if (this.sprite && !this.resolved) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.sprite, centerX, centerY);
+        }
+    }
+}
+
+/**
+ * Hazard Class (Lingering DOT zones)
+ */
+class Hazard {
+    constructor(x, y, r, lifetime, dps, color) {
+        this.x = x; this.y = y; this.r = r;
+        this.lifetime = lifetime;
+        this.dps = dps;
+        this.color = color;
+        this.tickTimer = 0;
+    }
+    update(dt, player) {
+        this.lifetime -= dt;
+        this.tickTimer -= dt;
+        if (this.tickTimer <= 0) {
+            if (MathUtils.dist(this.x, this.y, player.x, player.y) < this.r + player.radius) {
+                player.takeDamage(this.dps);
+            }
+            this.tickTimer = 0.5; // Tick damage every 0.5s
+        }
+        return this.lifetime > 0;
+    }
+    draw(ctx) {
+        // Flickering glitchy effect for admin hazards
+        ctx.fillStyle = (Math.random() > 0.1) ? this.color : 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#00ff00';
+        ctx.stroke();
+    }
+}
+
+/**
+ * Collectible Class (Health/Speed buffs)
+ */
+class Collectible {
+    constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type; // 'health' or 'speed'
+        this.r = 15;
+        this.active = true;
+        this.lifetime = 10.0; // Despawn after 10 seconds
+    }
+    update(dt, player) {
+        if (!this.active) return false;
+        this.lifetime -= dt;
+        if (this.lifetime <= 0) return false;
+        
+        if (MathUtils.dist(this.x, this.y, player.x, player.y) < this.r + player.radius) {
+            if (this.type === 'health') {
+                player.hp = Math.min(player.maxHp, player.hp + 100);
+                player.takeDamage(0); // update UI
+            } else if (this.type === 'speed') {
+                player.speedBuffTimer = 5.0; // 5 seconds of extra speed
+            }
+            this.active = false;
+            // particle effect
+            if (game) game.spawnParticles(this.x, this.y, this.type==='health'?'#2ecc71':'#f1c40f', 15, 100, 0.5, 3);
+        }
+        return this.active;
+    }
+    draw(ctx) {
+        if (this.lifetime < 2.0 && Math.sin(this.lifetime * 20) > 0) return; // Blink before despawn
+        ctx.fillStyle = this.type === 'health' ? '#e74c3c' : '#f1c40f';
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(this.type === 'health' ? '❤️' : '⚡', this.x, this.y+1);
+    }
+}
+
+/**
+ * Entities
+ */
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 12;
+        this.speed = 200;
+        this.maxHp = 200; // Increased base HP
+        this.hp = this.maxHp;
+        
+        this.fireCooldown = 0;
+        this.fireRate = 0.25; // seconds between shots
+        this.baseDamage = 5;
+        this.weapon = 'default'; // Current equipped gun
+        this.hasWeapon = false; // Granted during tutorial
+
+        // Dash mechanics
+        this.dashCooldown = 0;
+        this.dashTime = 0;
+        this.dashDir = {x: 0, y: 0};
+        
+        // Melee mechanics
+        this.meleeCooldown = 0;
+        this.spikeCooldown = 0;
+        
+        // Collectible mechanics
+        this.speedBuffTimer = 0;
+    }
+
+    update(dt, room) {
+        this.dashCooldown -= dt;
+        this.dashTime -= dt;
+        this.meleeCooldown -= dt;
+        this.fireCooldown -= dt;
+        this.spikeCooldown -= dt;
+        if (this.speedBuffTimer > 0) this.speedBuffTimer -= dt;
+
+        // FIX: Prevent negative cooldown debt from accumulating unless the bug is intentionally enabled
+        if (!window.stackBugEnabled && this.fireCooldown < 0) {
+            this.fireCooldown = 0;
+        }
+
+        let dx = 0; let dy = 0;
+
+        if (this.dashTime > 0) {
+            // Lock movement to dash direction and increase speed
+            dx = this.dashDir.x;
+            dy = this.dashDir.y;
+            this.speedMultiplier = 3.5;
+            
+            // Dash particles
+            if (game) game.spawnParticles(this.x, this.y, '#3498db', 1, 20, 0.2, 4);
+        } else {
+            this.speedMultiplier = 1;
+            if (keys.w) dy -= 1;
+            if (keys.s) dy += 1;
+            if (keys.a) dx -= 1;
+            if (keys.d) dx += 1;
+
+            if (dx !== 0 && dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx /= length; dy /= length;
+            }
+
+            // Dash Trigger
+            if (this.hasWeapon && keys[' '] && this.dashCooldown <= 0 && (dx !== 0 || dy !== 0)) {
+                this.dashCooldown = 1.5;
+                this.dashTime = 0.15; // 150ms dash duration
+                this.dashDir = {x: dx, y: dy};
+            }
+        }
+
+        let activeSpeed = this.speed;
+        if (game && game.roomIndex === 7) activeSpeed *= 1.5; // 50% extra movement speed for Admin!
+        else if (game && game.roomIndex === 8) activeSpeed *= 1.3; // 30% extra movement speed for Lab Core!
+        
+        // Speed Potion Buff
+        if (this.speedBuffTimer > 0) activeSpeed *= 1.6;
+
+        let nextX = this.x + dx * (activeSpeed * this.speedMultiplier) * dt;
+        let nextY = this.y + dy * (activeSpeed * this.speedMultiplier) * dt;
+
+        // Collision with walls and boundaries
+        nextX = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, nextX));
+        nextY = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, nextY));
+
+        // Slide along walls
+        let canMoveX = true;
+        let canMoveY = true;
+
+        for (const wall of room.walls) {
+            if (MathUtils.circleRectCollide(nextX, this.y, this.radius, wall.x, wall.y, wall.w, wall.h)) canMoveX = false;
+            if (MathUtils.circleRectCollide(this.x, nextY, this.radius, wall.x, wall.y, wall.w, wall.h)) canMoveY = false;
+        }
+        for (const pillar of room.pillars) {
+            if (MathUtils.dist(nextX, this.y, pillar.x, pillar.y) < this.radius + pillar.r) canMoveX = false;
+            if (MathUtils.dist(this.x, nextY, pillar.x, pillar.y) < this.radius + pillar.r) canMoveY = false;
+        }
+        for (const spike of room.spikes) {
+            if (MathUtils.dist(nextX, this.y, spike.x, spike.y) < this.radius + spike.r) canMoveX = false;
+            if (MathUtils.dist(this.x, nextY, spike.x, spike.y) < this.radius + spike.r) canMoveY = false;
+
+            if (MathUtils.dist(this.x, this.y, spike.x, spike.y) < this.radius + spike.r + 2) {
+                if (this.spikeCooldown <= 0) {
+                    this.takeDamage(15, 'spike');
+                    this.spikeCooldown = 1.0;
+                }
+            }
+        }
+
+        if (canMoveX) this.x = nextX;
+        if (canMoveY) this.y = nextY;
+
+        if (this.hasWeapon) {
+            // Check for hidden dollar bill
+            if (room.dollar && !room.dollar.collected) {
+                if (MathUtils.circleRectCollide(this.x, this.y, this.radius, room.dollar.x, room.dollar.y, room.dollar.w, room.dollar.h)) {
+                    room.dollar.collected = true;
+                    unlockAchievement('found_a_dollar');
+                }
+            }
+
+            // Ranged Firing (Left Click)
+            if (mouse.down) {
+                let actualFireRate = this.fireRate;
+                if (this.weapon === 'minigun') actualFireRate *= 0.3;
+                else if (this.weapon === 'shotgun') actualFireRate *= 1.5;
+                else if (this.weapon === 'rocket') actualFireRate *= 2.0;
+                else if (this.weapon === 'laser') actualFireRate = 0.005; // 200 times per second!
+                else if (this.weapon === 'god_gun') actualFireRate = 0.05; // 20 times a sec for Awakened
+
+                if (this.fireCooldown <= 0) {
+                    let shotsFired = 0;
+                    let maxShots = window.stackBugEnabled ? 50 : 10; // Let it shoot up to 50 projectiles per frame if the bug is on!
+                    
+                    // Cap the while loop so lag spikes don't crash the browser
+                    while (this.fireCooldown <= 0 && shotsFired < maxShots) {
+                        shotsFired++;
+                        this.fireCooldown += actualFireRate;
+                        const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+
+                        // Muzzle flash particles
+                        if (game && this.weapon !== 'laser' && this.weapon !== 'god_gun') {
+                            const barrelX = this.x + Math.cos(angle) * 15;
+                            const barrelY = this.y + Math.sin(angle) * 15;
+                            game.spawnParticles(barrelX, barrelY, '#f1c40f', 2, 80, 0.15, 2);
+                        }
+
+                        if (this.weapon === 'shotgun') {
+                            for (let i = -2; i <= 2; i++) {
+                                const spreadAngle = angle + (i * 0.15);
+                                game.projectiles.push(new Projectile(this.x, this.y, spreadAngle, true, 'magic', this.baseDamage));
+                            }
+                        } else if (this.weapon === 'minigun') {
+                            const spreadAngle = angle + (Math.random() - 0.5) * 0.2;
+                            game.projectiles.push(new Projectile(this.x, this.y, spreadAngle, true, 'magic', this.baseDamage * 0.7));
+                        } else if (this.weapon === 'laser') {
+                            // Increased damage per laser tick. 200/sec makes this melt enemies!
+                            const proj = new Projectile(this.x, this.y, angle, true, 'player_laser', this.baseDamage * 0.5); 
+                            proj.speed = 1500; // Extremely fast
+                            proj.vx = Math.cos(angle) * proj.speed;
+                            proj.vy = Math.sin(angle) * proj.speed;
+                            proj.maxRange = 600;
+                            game.projectiles.push(proj);
+                        } else if (this.weapon === 'rocket') {
+                            const proj = new Projectile(this.x, this.y, angle, true, 'rocket', this.baseDamage);
+                            proj.speed = 500;
+                            proj.vx = Math.cos(angle) * proj.speed;
+                            proj.vy = Math.sin(angle) * proj.speed;
+                            proj.maxRange = 600;
+                            game.projectiles.push(proj);
+                        } else if (this.weapon === 'god_gun') {
+                            // Awakened form weapon: Piercing core laser + 2 Homing Rockets simultaneously
+                            const projL = new Projectile(this.x, this.y, angle, true, 'player_laser', this.baseDamage); 
+                            projL.speed = 2000; projL.vx = Math.cos(angle) * projL.speed; projL.vy = Math.sin(angle) * projL.speed;
+                            projL.maxRange = 1200;
+                            game.projectiles.push(projL);
+
+                            for(let i of [-1, 1]) {
+                                const spread = angle + i * 0.4;
+                                const projR = new Projectile(this.x, this.y, spread, true, 'magic', this.baseDamage * 2);
+                                projR.speed = 700; projR.vx = Math.cos(spread) * projR.speed; projR.vy = Math.sin(spread) * projR.speed;
+                                projR.homingTarget = room.boss;
+                                game.projectiles.push(projR);
+                            }
+                        } else {
+                            game.projectiles.push(new Projectile(this.x, this.y, angle, true, 'magic', this.baseDamage));
+                        }
+                    }
+                    if (this.fireCooldown < 0 && !window.stackBugEnabled) this.fireCooldown = 0; // Reset debt
+                }
+            }
+
+            // Melee Attack (Right Click)
+            if (mouse.rightDown && this.meleeCooldown <= 0) {
+                this.meleeCooldown = 0.6; // 600ms cooldown
+                const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+                // Melee is a large, short-ranged projectile that deals 3x damage
+                game.projectiles.push(new Projectile(this.x, this.y, angle, true, 'melee', this.baseDamage * 3));
+            }
+        }
+    }
+
+    takeDamage(amount, source = null) {
+        if (this.dashTime > 0) return; // Optional i-frames during dash
+        if (amount > 0 && game) {
+            game.runDamaged = true; // Track for achievement
+            game.spawnParticles(this.x, this.y, '#e74c3c', 10, 150, 0.3, 3); // Player bleeding
+        }
+        this.hp -= amount;
+        if (this.hp < 0) this.hp = 0;
+        document.getElementById('player-health-fill').style.width = `${(this.hp / this.maxHp) * 100}%`;
+        if (this.hp <= 0) {
+            if (game && game.room && game.room.boss instanceof GolemBoss) unlockAchievement('dumber_than_a_rock');
+            if (source === 'wall') unlockAchievement('wall_hugger');
+            if (source === 'spike') unlockAchievement('spiked');
+            game.gameOver(false);
+        }
+    }
+
+    draw(ctx) {
+        // Dash visual feedback
+        if (this.dashTime > 0) {
+            ctx.fillStyle = 'rgba(52, 152, 219, 0.4)';
+            ctx.beginPath(); ctx.arc(this.x - this.dashDir.x * 15, this.y - this.dashDir.y * 15, this.radius, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Classic Circle Player Sprite
+        ctx.fillStyle = '#3498db';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#2980b9';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw aim indicator
+        if (this.hasWeapon) {
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            const aimDist = 25;
+            const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+            ctx.lineTo(this.x + Math.cos(angle) * aimDist, this.y + Math.sin(angle) * aimDist);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+}
+
+class Projectile {
+    constructor(x, y, angle, isPlayer = true, type = 'default', damage = 5) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * 400;
+        this.vy = Math.sin(angle) * 400;
+        this.radius = 5;
+        this.isPlayer = isPlayer;
+        this.active = true;
+        this.damage = damage;
+        this.type = type;
+        this.hitCooldown = 0; // Cooldown to prevent multi-hit piercing instakills
+        
+        // Range limits
+        this.distanceTraveled = 0;
+        this.maxRange = isPlayer ? 250 : Infinity; 
+        
+        // Adjust properties based on type
+        if (this.type === 'poison') {
+            this.vx = Math.cos(angle) * 200;
+            this.vy = Math.sin(angle) * 200;
+            this.radius = 6;
+        } else if (this.type === 'earth') {
+            this.vx = Math.cos(angle) * 150;
+            this.vy = Math.sin(angle) * 150;
+            this.radius = 8;
+        } else if (this.type === 'bomb') {
+            this.vx = Math.cos(angle) * 250;
+            this.vy = Math.sin(angle) * 250;
+            this.radius = 8;
+        } else if (this.type === 'melee') {
+            this.vx = Math.cos(angle) * 500;
+            this.vy = Math.sin(angle) * 500;
+            this.radius = 28; // Wide hitbox
+            this.maxRange = 70; // Very short range
+        } else if (this.type === 'gear') {
+            this.vx = Math.cos(angle) * 180;
+            this.vy = Math.sin(angle) * 180;
+            this.radius = 18;
+            this.lifetime = 4.0; // Acts like boomerang later
+        } else if (this.type === 'slash') {
+            this.vx = Math.cos(angle) * 550;
+            this.vy = Math.sin(angle) * 550;
+            this.radius = 20;
+            this.maxRange = Infinity;
+        } else if (this.type === 'special_missile') {
+            // Stats set in the LabCore boss logic
+        } else if (this.type === 'player_laser') {
+            // Set in player update
+        }
+
+        // Homing and lifetime
+        this.speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        this.homingTarget = null;
+        if(this.lifetime === undefined) this.lifetime = Infinity;
+    }
+
+    explode(room) {
+        let radius = 90;
+        let dmgMult = 6;
+        
+        // Visual flash (immediate)
+        const t = new Telegraph('circle', {x: this.x, y: this.y, r: radius}, 0.2, 0, null, '💥');
+        t.resolved = true; 
+        game.telegraphs.push(t);
+        
+        // Particles
+        if (game) game.spawnParticles(this.x, this.y, '#e67e22', 30, 300, 0.6, 5);
+        
+        // Damage
+        if (room.boss instanceof TutorialDirector) {
+            for (let m of room.boss.minions) {
+                if (m.hp > 0 && MathUtils.dist(this.x, this.y, m.x, m.y) <= radius + m.r) {
+                    m.hp -= this.damage * dmgMult;
+                }
+            }
+        } else if (room.boss instanceof LabCoreBoss) {
+            if (room.boss.phase === 'BUTTON' && room.boss.button.active) {
+                let b = room.boss.button;
+                // Allow explosions to absolutely blast the button
+                if (MathUtils.circleRectCollide(this.x, this.y, radius, b.x, b.y, b.w, b.h)) {
+                    b.hp -= this.damage * dmgMult;
+                    if (b.hp <= 0) {
+                        b.active = false;
+                        room.boss.startEndingCutscene();
+                    }
+                }
+            }
+        } else if (room.boss && room.boss.hp > 0) {
+            if (MathUtils.dist(this.x, this.y, room.boss.x, room.boss.y) <= radius + room.boss.radius) {
+                room.boss.takeDamage(this.damage * dmgMult);
+            }
+        }
+    }
+
+    update(dt, room) {
+        if (this.lifetime !== Infinity) {
+            this.lifetime -= dt;
+            if (this.lifetime <= 0) {
+                this.active = false;
+                return;
+            }
+        }
+
+        if (this.hitCooldown > 0) {
+            this.hitCooldown -= dt;
+        }
+
+        // Gear boomerang effect
+        if (this.type === 'gear' && this.lifetime < 2.5) { // Return sequence
+            if (room.boss && room.boss.hp > 0) {
+                const angle = Math.atan2(room.boss.y - this.y, room.boss.x - this.x);
+                this.vx = Math.cos(angle) * 250;
+                this.vy = Math.sin(angle) * 250;
+                if (MathUtils.dist(this.x, this.y, room.boss.x, room.boss.y) < 30) this.active = false; // caught
+            }
+        }
+
+        if (this.homingTarget && this.homingTarget.hp > 0) {
+            const angleToTarget = Math.atan2(this.homingTarget.y - this.y, this.homingTarget.x - this.x);
+            const currentAngle = Math.atan2(this.vy, this.vx);
+            const turnRate = this.type === 'special_missile' ? 1.5 : 2.5; // Special missile turns slower
+            let diff = angleToTarget - currentAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            const newAngle = currentAngle + Math.sign(diff) * Math.min(Math.abs(diff), turnRate * dt);
+            this.vx = Math.cos(newAngle) * this.speed;
+            this.vy = Math.sin(newAngle) * this.speed;
+        }
+        
+        // Special Missile Generator Collision Check
+        if (this.type === 'special_missile' && room.boss instanceof LabCoreBoss && room.boss.phase === 'GENERATORS') {
+            for (let g of room.boss.generators) {
+                if (g.active && MathUtils.dist(this.x, this.y, g.x, g.y) < this.radius + g.r) {
+                    g.active = false;
+                    this.active = false; // Hit generator
+                    game.telegraphs.push(new Telegraph('circle', {x: g.x, y: g.y, r: 80}, 0.2, 0, null, '💥'));
+                    if (game) game.spawnParticles(g.x, g.y, '#f1c40f', 40, 250, 0.8, 6); // Spark explosion
+                    
+                    if (room.boss.generators.every(gen => !gen.active)) {
+                        room.boss.phase = 'BUTTON';
+                        room.boss.button.active = true; // Enable the button!
+                        
+                        if (game) {
+                            game.playDialogue([
+                                {speaker: 'System', text: 'WARNING: GENERATORS DESTROYED. EMERGENCY RELEASE BUTTON EXPOSED.'},
+                                {speaker: 'Player', text: 'There it is! I just have to blast that button!'}
+                            ]);
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+
+        const dx = this.vx * dt;
+        const dy = this.vy * dt;
+        this.x += dx;
+        this.y += dy;
+        this.distanceTraveled += Math.sqrt(dx*dx + dy*dy);
+
+        // Maximum range check
+        if (this.distanceTraveled >= this.maxRange) {
+            if (this.type === 'rocket') this.explode(room);
+            this.active = false;
+            return;
+        }
+
+        // Bounds (Gears bounce slightly or return, others die)
+        if (this.x < 0 || this.x > ROOM_SIZE || this.y < 0 || this.y > ROOM_SIZE) {
+            if (this.type === 'rocket') this.explode(room);
+            if (this.type !== 'gear') {
+                this.active = false;
+                if (game) game.spawnParticles(this.x, this.y, '#95a5a6', 3, 40, 0.2, 2);
+            }
+            return;
+        }
+
+        // Wall hit (Gears pierce/ignore walls, melee ignores, special missile phases through!)
+        if (this.type !== 'gear' && this.type !== 'melee' && this.type !== 'player_laser' && this.type !== 'special_missile') {
+            let hitWall = false;
+            for (const wall of room.walls) {
+                if (this.x > wall.x && this.x < wall.x + wall.w && this.y > wall.y && this.y < wall.y + wall.h) {
+                    hitWall = true; break;
+                }
+            }
+            if (!hitWall) {
+                for (const pillar of room.pillars) {
+                    if (MathUtils.dist(this.x, this.y, pillar.x, pillar.y) <= this.radius + pillar.r) {
+                        hitWall = true; break;
+                    }
+                }
+            }
+
+            if (hitWall) {
+                if (this.type === 'rocket') {
+                    this.explode(room);
+                } else {
+                    if (game) game.spawnParticles(this.x, this.y, '#95a5a6', 4, 50, 0.2, 3);
+                }
+                this.active = false;
+                return;
+            }
+        }
+
+        // Entity hit
+        if (this.isPlayer) {
+            if (room.boss instanceof TutorialDirector) {
+                let hitAny = false;
+                for (let m of room.boss.minions) {
+                    if (m.hp > 0 && MathUtils.dist(this.x, this.y, m.x, m.y) < this.radius + m.r) {
+                        if (this.hitCooldown <= 0) {
+                            m.hp -= this.damage;
+                            if (game) game.spawnParticles(m.x, m.y, m.color, 6, 80, 0.3, 3);
+                            if (this.type === 'rocket') {
+                                this.explode(room);
+                                this.active = false;
+                            } else {
+                                if (this.type === 'melee') this.hitCooldown = 0.5;
+                                else this.active = false;
+                            }
+                        }
+                        hitAny = true;
+                    }
+                }
+                if (hitAny) return;
+            } else if (room.boss instanceof LabCoreBoss) {
+                // Damaging the "FREE PRISONERS" Button
+                if (room.boss.phase === 'BUTTON') {
+                    let b = room.boss.button;
+                    if (b.active && MathUtils.circleRectCollide(this.x, this.y, this.radius, b.x, b.y, b.w, b.h)) {
+                        if (this.hitCooldown <= 0) {
+                            b.hp -= this.damage; // Use real damage scaling instead of hardcoded 1
+                            if (game) game.spawnParticles(this.x, this.y, '#e74c3c', 5, 80, 0.3, 3);
+                            if (this.type === 'rocket') {
+                                this.explode(room);
+                                this.active = false;
+                            } else {
+                                if (this.type === 'melee') this.hitCooldown = 0.5;
+                                else this.active = false;
+                            }
+                            if (b.hp <= 0 && b.active) {
+                                b.active = false;
+                                room.boss.startEndingCutscene();
+                            }
+                        }
+                    }
+                }
+                return; // Players cannot hit the Core Boss directly
+            } else if (room.boss && room.boss.hp > 0) {
+                if (MathUtils.dist(this.x, this.y, room.boss.x, room.boss.y) < this.radius + room.boss.radius) {
+                    if (this.hitCooldown <= 0) {
+                        if (this.type === 'rocket') {
+                            this.explode(room);
+                            this.active = false;
+                        } else {
+                            room.boss.takeDamage(this.damage);
+                            if (game) game.spawnParticles(this.x, this.y, room.boss.color, 6, 80, 0.3, 3);
+                            if (this.type === 'melee') {
+                                this.hitCooldown = 0.5;
+                            } else {
+                                this.active = false; // Laser also vanishes immediately after dumping damage
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (!this.isPlayer) {
+            if (MathUtils.dist(this.x, this.y, game.player.x, game.player.y) < this.radius + game.player.radius) {
+                if (this.hitCooldown <= 0) {
+                    game.player.takeDamage(this.damage);
+                    if (this.type !== 'gear') {
+                        this.active = false; // Normal projectiles die
+                    } else {
+                        // Gears pierce, but give them a cooldown so they don't instakill you 60 times a second
+                        this.hitCooldown = 0.5; 
+                    }
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.type === 'magic') {
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'melee') {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'fire') {
+            ctx.fillStyle = '#e67e22';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius*0.5, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'poison') {
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#27ae60';
+            ctx.beginPath(); ctx.arc(this.x-2, this.y-2, this.radius*0.3, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'earth') {
+            ctx.fillStyle = '#7f8c8d';
+            ctx.beginPath();
+            ctx.moveTo(this.x - this.radius, this.y - this.radius);
+            ctx.lineTo(this.x + this.radius, this.y - this.radius*0.8);
+            ctx.lineTo(this.x + this.radius*0.9, this.y + this.radius);
+            ctx.lineTo(this.x - this.radius*0.8, this.y + this.radius*0.9);
+            ctx.closePath();
+            ctx.fill();
+        } else if (this.type === 'bomb') {
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#e74c3c'; // fuse
+            ctx.beginPath(); ctx.arc(this.x, this.y-this.radius, this.radius*0.4, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'gear') {
+            ctx.fillStyle = '#95a5a6';
+            ctx.beginPath();
+            // Draw a saw-like gear
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI) / 4 + (performance.now() / 200);
+                const r = (i % 2 === 0) ? this.radius : this.radius * 0.6;
+                const px = this.x + Math.cos(angle) * r;
+                const py = this.y + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#34495e';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius*0.3, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'slash') {
+            ctx.fillStyle = '#8e44ad';
+            ctx.beginPath();
+            // Crescent shape
+            const angle = Math.atan2(this.vy, this.vx);
+            ctx.arc(this.x, this.y, this.radius, angle - Math.PI/2, angle + Math.PI/2);
+            ctx.lineTo(this.x + Math.cos(angle) * this.radius * 1.5, this.y + Math.sin(angle) * this.radius * 1.5);
+            ctx.closePath();
+            ctx.fill();
+        } else if (this.type === 'special_missile') {
+            ctx.fillStyle = '#8e44ad';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('💀', this.x, this.y + 2);
+        } else if (this.type === 'player_laser') {
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            const angle = Math.atan2(this.vy, this.vx);
+            ctx.arc(this.x, this.y, this.radius, angle - Math.PI/2, angle + Math.PI/2);
+            ctx.lineTo(this.x + Math.cos(angle) * this.radius * 8, this.y + Math.sin(angle) * this.radius * 8); // Long beam effect
+            ctx.closePath();
+            ctx.fill();
+        } else if (this.type === 'rocket') {
+            ctx.fillStyle = '#bdc3c7';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath(); ctx.arc(this.x - (this.vx/this.speed)*this.radius, this.y - (this.vy/this.speed)*this.radius, this.radius*0.5, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.fillStyle = this.isPlayer ? '#f1c40f' : '#e67e22';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+}
+
+/**
+ * Base Boss Class
+ */
+class Boss {
+    constructor(name, x, y, maxHp, radius, color) {
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.maxHp = maxHp;
+        this.hp = maxHp;
+        this.radius = radius;
+        this.color = color;
+        
+        this.state = 'IDLE'; // IDLE, ATTACKING, DASHING
+        this.stateTimer = 2.0; // Wait before first attack
+        
+        // Show UI
+        const ui = document.getElementById('boss-health');
+        if (ui) ui.classList.remove('hidden');
+        const hpText = document.getElementById('boss-health-text');
+        if (hpText) hpText.innerText = this.name;
+        this.updateHealthUI();
+    }
+
+    updateHealthUI() {
+        const hpFill = document.getElementById('boss-health-fill');
+        if (hpFill) hpFill.style.width = `${Math.max(0, (this.hp / this.maxHp)) * 100}%`;
+    }
+
+    takeDamage(amt) {
+        if (this.hp <= 0) return;
+        this.hp -= amt;
+        this.updateHealthUI();
+        if (this.hp <= 0) {
+            this.hp = 0;
+            if (game) game.spawnParticles(this.x, this.y, this.color, 100, 400, 1.5, 6); // Massive death explosion
+            this.die();
+        }
+    }
+
+    die() {
+        const hpUI = document.getElementById('boss-health');
+        if (hpUI) hpUI.classList.add('hidden');
+        game.roomCleared();
+    }
+
+    update(dt, player) {
+        // Base behavior to be overridden or extended
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+}
+
+/**
+ * Boss 0: Tutorial Sequence
+ */
+class TutorialDirector extends Boss {
+    constructor(x, y) {
+        super("Tutorial", x, y, 1, 0, 'transparent');
+        this.tutorialState = 0;
+        this.friend = {x: ROOM_SIZE/2, y: ROOM_SIZE + 50, active: false};
+        this.admin = {x: ROOM_SIZE/2, y: -50, active: false};
+        this.gun = {x: ROOM_SIZE/2, y: ROOM_SIZE/2, active: false, pickedUp: false};
+        this.minions = [];
+        this.dungeonY = -200;
+        this.objective = "WASD to Move. Walk forward.";
+        
+        setTimeout(() => {
+            const hpUI = document.getElementById('boss-health');
+            if (hpUI) hpUI.classList.add('hidden');
+        }, 10);
+    }
+
+    takeDamage(amt) {} // Invincible director
+
+    update(dt, player) {
+        // Cutscene states run sequentially. If a state triggers dialogue, the game pauses
+        // until the dialogue ends, and the dialogue callback sets the next state.
+        
+        if (this.tutorialState === 0) {
+            if (player.y < ROOM_SIZE * 0.6) {
+                this.tutorialState = 1; // Wait
+                game.playDialogue([
+                    {speaker: 'Friend', text: 'What is that thing?!'},
+                    {speaker: 'Player', text: 'Get back!'}
+                ], () => {
+                    this.tutorialState = 2; // Trigger dungeon
+                });
+            }
+        } else if (this.tutorialState === 2) {
+            this.dungeonY += (ROOM_SIZE * 0.2 - this.dungeonY) * 5 * dt;
+            if (Math.abs(this.dungeonY - ROOM_SIZE * 0.2) < 2) {
+                this.friend.active = true;
+                this.friend.y = ROOM_SIZE - 20;
+                this.tutorialState = 3; // Wait
+                game.playDialogue([
+                    {speaker: 'Friend', text: "It's pulling me! Help!"},
+                    {speaker: 'The Admin', text: "SUBJECT ACQUIRED. INITIATING EXTRACTION."},
+                    {speaker: 'Player', text: "Let them go!"}
+                ], () => {
+                    this.tutorialState = 4; // Trigger kidnapping animation
+                    this.admin.active = true;
+                    this.admin.y = this.friend.y;
+                });
+            }
+        } else if (this.tutorialState === 4) {
+            this.friend.y -= 200 * dt;
+            this.admin.y -= 200 * dt;
+            if (this.friend.y < -50) {
+                this.tutorialState = 5; // Wait
+                game.playDialogue([
+                    {speaker: 'The Admin', text: 'Engaging defensive protocols.'},
+                    {speaker: 'System', text: 'ANOMALY DETECTED. WEAPONIZED PAYLOAD SECURED.'}
+                ], () => {
+                    this.tutorialState = 6;
+                    this.gun.active = true;
+                    this.minions.push(new Minion(100, 200, 'small'));
+                    this.minions.push(new Minion(ROOM_SIZE-100, 200, 'small'));
+                    this.minions.push(new Minion(ROOM_SIZE/2, 150, 'big'));
+                    this.objective = "Grab the glowing weapon in the center!";
+                });
+            }
+        } else if (this.tutorialState === 6) {
+            this.dungeonY -= 100 * dt;
+            if (!this.gun.pickedUp && MathUtils.dist(player.x, player.y, this.gun.x, this.gun.y) < 30) {
+                this.gun.pickedUp = true;
+                this.gun.active = false;
+                player.hasWeapon = true;
+                this.tutorialState = 7;
+                game.playDialogue([
+                    {speaker: 'Player', text: "Let's see what this can do."},
+                    {speaker: 'System', text: 'Left Click: Shoot. Space: Dash. Right Click: Melee.'}
+                ], () => {
+                    this.tutorialState = 8;
+                    this.minions.forEach(m => m.active = true);
+                    this.objective = "Defeat the firewall guards!";
+                });
+            }
+        } else if (this.tutorialState === 8) {
+            let alive = false;
+            for (let m of this.minions) {
+                m.update(dt, player);
+                if (m.hp > 0) alive = true;
+            }
+            if (!alive) {
+                this.tutorialState = 9;
+                game.playDialogue([
+                    {speaker: 'System', text: 'BREACH SUCCESSFUL. PROCEED TO NEXT SECTOR.'}
+                ], () => {
+                    this.hp = 0;
+                    this.die();
+                    this.objective = "Enter the portal.";
+                });
+            }
+        }
+    }
+
+    draw(ctx) {
+        // Draw Dungeon background element
+        if (this.tutorialState >= 1) {
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(ROOM_SIZE*0.2, this.dungeonY - 100, ROOM_SIZE*0.6, 200);
+            ctx.fillStyle = '#1a252f';
+            ctx.fillRect(ROOM_SIZE*0.4, this.dungeonY + 20, ROOM_SIZE*0.2, 80); // door
+            ctx.fillStyle = '#8e44ad'; // spooky glow
+            ctx.fillRect(ROOM_SIZE*0.45, this.dungeonY + 40, ROOM_SIZE*0.1, 60);
+        }
+
+        if (this.friend.active) {
+            ctx.fillStyle = '#ffb8b8'; // Pinkish
+            ctx.beginPath(); ctx.arc(this.friend.x, this.friend.y, 10, 0, Math.PI*2); ctx.fill();
+            // Add a little bow or hair to distinguish
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(this.friend.x - 5, this.friend.y - 12, 10, 4);
+        }
+        if (this.admin.active) {
+            ctx.fillStyle = '#00ff00'; // Glitchy green admin
+            ctx.fillRect(this.admin.x - 15, this.admin.y - 15, 30, 30);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText("010", this.admin.x, this.admin.y+5);
+        }
+        if (this.gun.active) {
+            ctx.fillStyle = '#f1c40f'; // Gold gun
+            ctx.fillRect(this.gun.x - 10, this.gun.y - 5, 20, 10);
+            // pulse
+            ctx.strokeStyle = `rgba(241, 196, 15, ${Math.abs(Math.sin(performance.now()/200))})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(this.gun.x, this.gun.y, 25, 0, Math.PI*2); ctx.stroke();
+        }
+
+        for (let m of this.minions) m.draw(ctx);
+
+        // Draw tutorial objective
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 20px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(this.objective, ROOM_SIZE/2, ROOM_SIZE - 20);
+        ctx.shadowBlur = 0;
+    }
+}
+
+/**
+ * Boss 1: Robot (Mecha Sentinel)
+ */
+class RobotBoss extends Boss {
+    constructor(x, y) {
+        super("Mecha Sentinel", x, y, 1800, 45, '#95a5a6'); // Reduced HP Buff
+        this.speed = 100; // Faster
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state === 'IDLE') {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(angle) * this.speed * dt;
+            this.y += Math.sin(angle) * this.speed * dt;
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.3 + Math.random() * 0.3; // Relentless attacks
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        
+        const r = Math.random();
+        if (r < 0.2) this.attackRotatingLaser();
+        else if (r < 0.4) this.attackHomingMissiles(player);
+        else if (r < 0.6) this.attackGearThrow(player);
+        else if (r < 0.8) this.attackLaserGrid();
+        else this.attackBullets(player);
+    }
+
+    attackLaserGrid() {
+        this.stateTimer = 2.0;
+        // Horizontal lines
+        for(let i = 1; i < 5; i++) {
+            const y = (ROOM_SIZE / 5) * i;
+            game.telegraphs.push(new Telegraph('line', {
+                x1: 0, y1: y, x2: ROOM_SIZE, y2: y, w: 40
+            }, 1.2, 42, null, '⚡'));
+        }
+        // Vertical lines
+        for(let i = 1; i < 5; i++) {
+            const x = (ROOM_SIZE / 5) * i;
+            game.telegraphs.push(new Telegraph('line', {
+                x1: x, y1: 0, x2: x, y2: ROOM_SIZE, w: 40
+            }, 1.2, 42, null, '⚡'));
+        }
+    }
+
+    attackRotatingLaser() {
+        this.stateTimer = 4.8; // Adjusted for slower sweep
+        const startAngle = Math.random() * Math.PI * 2;
+        
+        // Spawn sequential lines that form a SINGLE sweeping arc
+        for (let i = 0; i < 30; i++) {
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                
+                const angle = startAngle + (i * 0.15); // Single laser sweep
+                const endX = this.x + Math.cos(angle) * 800;
+                const endY = this.y + Math.sin(angle) * 800;
+                game.telegraphs.push(new Telegraph('line', {
+                    x1: this.x, y1: this.y, x2: endX, y2: endY, w: 45
+                }, 0.5, 12, null, '⚡')); 
+            }, i * 150); // Slower sweep (150ms interval instead of 100ms)
+        }
+    }
+
+    attackHomingMissiles(player) {
+        this.stateTimer = 2.0; 
+        for (let i = 0; i < 12; i++) { // More Missiles
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const angle = Math.random() * Math.PI * 2;
+                const proj = new Projectile(this.x, this.y, angle, false, 'bomb', 17);
+                proj.speed = 140; // Faster tracking
+                proj.vx = Math.cos(angle) * proj.speed;
+                proj.vy = Math.sin(angle) * proj.speed;
+                proj.homingTarget = player;
+                proj.lifetime = 4.0;
+                proj.maxRange = Infinity;
+                
+                // Explode upon death
+                const ogUpdate = proj.update.bind(proj);
+                proj.update = (dt, room) => {
+                    ogUpdate(dt, room);
+                    if (!proj.active) {
+                        game.telegraphs.push(new Telegraph('circle', {x: proj.x, y: proj.y, r: 70}, 0.5, 33, null, '💥'));
+                    }
+                };
+                game.projectiles.push(proj);
+            }, i * 150); 
+        }
+    }
+
+    attackGearThrow(player) {
+        this.stateTimer = 1.0;
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        
+        // Throw 8 gears in a complete circle
+        for (let i = 0; i < 8; i++) {
+            const angle = baseAngle + (i * Math.PI / 4);
+            const proj = new Projectile(this.x, this.y, angle, false, 'gear', 18); // Reduced base damage
+            game.projectiles.push(proj);
+        }
+    }
+
+    attackBullets(player) {
+        this.stateTimer = 1.5;
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        
+        // Huge Machine gun burst
+        for (let i = 0; i < 25; i++) {
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const angle = baseAngle + (Math.random() - 0.5) * 0.5; // wider spread
+                const proj = new Projectile(this.x, this.y, angle, false, 'default', 13);
+                proj.vx = Math.cos(angle) * 550; // Super fast
+                proj.vy = Math.sin(angle) * 550;
+                game.projectiles.push(proj);
+            }, i * 30); // Extreme fire rate
+        }
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = this.color;
+        
+        // Save state for movement rotation (treads)
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Square-ish body for Robot
+        ctx.beginPath();
+        ctx.roundRect(-this.radius, -this.radius, this.radius*2, this.radius*2, 10);
+        ctx.fill();
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Tank Treads
+        ctx.fillStyle = '#34495e';
+        ctx.fillRect(-this.radius - 8, -this.radius * 0.8, 8, this.radius * 1.6);
+        ctx.fillRect(this.radius, -this.radius * 0.8, 8, this.radius * 1.6);
+        
+        // Eye / Visor
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.fillRect(-15, -8, 30, 8); // Cylon style visor
+        ctx.fill();
+
+        ctx.restore();
+
+        // Draw Admin fixing it if full health and in dialogue
+        if (this.hp === this.maxHp && game && game.dialogueActive) {
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(this.x + 30, this.y - 20, 20, 20);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText("010", this.x + 40, this.y - 5);
+        }
+    }
+}
+
+/**
+ * Boss 2: Ancient Golem
+ */
+class GolemBoss extends Boss {
+    constructor(x, y) {
+        super("Ancient Golem", x, y, 1500, 35, '#7f8c8d'); // Increased HP
+        this.spikePhase = 0;
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state === 'IDLE') {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(angle) * 50 * dt; // Golem now actively chases you
+            this.y += Math.sin(angle) * 50 * dt;
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.3 + Math.random() * 0.3; // Much faster attack speed
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 2.0; 
+        
+        const r = Math.random();
+        if (r < 0.2) this.attackSpikeWave();
+        else if (r < 0.4) this.attackDeleteBattlefield();
+        else if (r < 0.6) this.attackCreateWall(player);
+        else if (r < 0.8) this.attackEarthMissile(player);
+        else this.attackBoulderToss(player);
+    }
+
+    attackBoulderToss(player) {
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        for (let i = -1; i <= 1; i++) {
+            const angle = baseAngle + (i * 0.3);
+            const proj = new Projectile(this.x, this.y, angle, false, 'earth', 33);
+            proj.radius = 15;
+            proj.speed = 180;
+            proj.vx = Math.cos(angle) * proj.speed;
+            proj.vy = Math.sin(angle) * proj.speed;
+            game.projectiles.push(proj);
+        }
+        this.stateTimer = 1.0;
+    }
+
+    attackSpikeWave() {
+        // Alternating Rings
+        let rings = [];
+        if (this.spikePhase === 0) {
+            rings = [[20, 80], [140, 200], [260, 320]];
+        } else {
+            rings = [[80, 140], [200, 260], [320, 380]];
+        }
+        this.spikePhase = 1 - this.spikePhase; // toggle
+
+        rings.forEach((r) => {
+            game.telegraphs.push(new Telegraph('ring', {
+                x: this.x, y: this.y, innerR: r[0], outerR: r[1]
+            }, 2.0, 39, null, '🪨'));
+        });
+    }
+
+    attackDeleteBattlefield() {
+        // Creates a massive permanent wall block on one edge
+        const edges = [
+            {x: 0, y: 0, w: 100, h: ROOM_SIZE}, // Left
+            {x: ROOM_SIZE-100, y: 0, w: 100, h: ROOM_SIZE}, // Right
+            {x: 0, y: 0, w: ROOM_SIZE, h: 100}, // Top
+            {x: 0, y: ROOM_SIZE-100, w: ROOM_SIZE, h: 100} // Bottom
+        ];
+        // Pick random edge not currently filled completely
+        const edge = edges[Math.floor(Math.random() * edges.length)];
+
+        game.telegraphs.push(new Telegraph('rect', {
+            x: edge.x, y: edge.y, w: edge.w, h: edge.h
+        }, 2.5, 55, () => {
+            // Push player out if they are inside (crudely: move to center)
+            if (MathUtils.circleRectCollide(game.player.x, game.player.y, game.player.radius, edge.x, edge.y, edge.w, edge.h)) {
+                game.player.x = ROOM_SIZE/2;
+                game.player.y = ROOM_SIZE/2;
+            }
+            game.room.walls.push(edge);
+        }, '🧱', 'wall'));
+        this.stateTimer = 2.5;
+    }
+
+    attackCreateWall(player) {
+        // Spawn a rectangular wall between golem and player
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const midX = this.x + (dx/len) * (len/2);
+        const midY = this.y + (dy/len) * (len/2);
+
+        // Calculate perpendicular for wall width
+        const perpX = -dy / len;
+        const perpY = dx / len;
+        
+        const wallW = 100;
+        const wallH = 20;
+        
+        // We'll approximate rotated rect with an axis-aligned one for simplicity in this engine
+        const rect = {
+            x: midX - 50, y: midY - 20, w: 100, h: 40
+        };
+
+        game.telegraphs.push(new Telegraph('rect', rect, 1.5, 33, () => {
+            game.room.walls.push(rect);
+            // Walls created this way break after some time
+            setTimeout(() => {
+                const idx = game.room.walls.indexOf(rect);
+                if (idx > -1) game.room.walls.splice(idx, 1);
+            }, 8000);
+        }, '🧱', 'wall'));
+        this.stateTimer = 1.5;
+    }
+
+    attackEarthMissile(player) {
+        // Fires projectiles that leave an AoE zone when they expire
+        for(let i=-1; i<=1; i+=2) {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x) + (i * 0.2);
+            const proj = new Projectile(this.x, this.y, angle, false, 'earth', 22);
+            
+            // Custom update for missile to place telegraph
+            const ogUpdate = proj.update.bind(proj);
+            proj.update = (dt, room) => {
+                ogUpdate(dt, room);
+                if (!proj.active) { // hit wall or died
+                    game.telegraphs.push(new Telegraph('circle', {
+                        x: proj.x, y: proj.y, r: 60
+                    }, 1.0, 28, null, '💥'));
+                }
+            };
+            game.projectiles.push(proj);
+        }
+    }
+    
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = this.color;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // Draw as a blocky polygon for Golem
+        ctx.beginPath();
+        ctx.moveTo(-this.radius, -this.radius);
+        ctx.lineTo(this.radius, -this.radius*0.8);
+        ctx.lineTo(this.radius*0.9, this.radius);
+        ctx.lineTo(-this.radius*0.8, this.radius*0.9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Texture lines
+        ctx.beginPath();
+        ctx.moveTo(-this.radius*0.5, -this.radius*0.3);
+        ctx.lineTo(this.radius*0.4, 0);
+        ctx.moveTo(-this.radius*0.2, 10);
+        ctx.lineTo(this.radius*0.6, 15);
+        ctx.strokeStyle = '#34495e';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Glowing Eyes
+        ctx.fillStyle = '#e67e22';
+        ctx.beginPath(); ctx.arc(-10, -10, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(10, -8, 4, 0, Math.PI*2); ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Boss 3: Crimson Dragon
+ */
+class DragonBoss extends Boss {
+    constructor(x, y) {
+        super("Crimson Dragon", x, y, 1200, 50, '#c0392b'); // Increased HP and Size
+        this.speed = 180; // Significantly faster
+        this.dashTarget = null;
+        this.lastX = x;
+        this.lastY = y;
+        this.facingAngle = 0;
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.x !== this.lastX || this.y !== this.lastY) {
+            this.facingAngle = Math.atan2(this.y - this.lastY, this.x - this.lastX);
+            this.lastX = this.x;
+            this.lastY = this.y;
+        }
+
+        if (this.state === 'IDLE') {
+            // slowly move towards player
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            const dist = MathUtils.dist(this.x, this.y, player.x, player.y);
+            
+            if (dist > 150) {
+                this.x += Math.cos(angle) * this.speed * dt;
+                this.y += Math.sin(angle) * this.speed * dt;
+            }
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            // Frozen while telegraphing
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.05 + Math.random() * 0.1; // Cooldown (Attacks insanely faster)
+            }
+        } else if (this.state === 'DASHING') {
+            // Move quickly to dash target
+            const angle = Math.atan2(this.dashTarget.y - this.y, this.dashTarget.x - this.x);
+            this.x += Math.cos(angle) * 800 * dt; // Faster dash
+            this.y += Math.sin(angle) * 800 * dt;
+            if (MathUtils.dist(this.x, this.y, this.dashTarget.x, this.dashTarget.y) < 20) {
+                this.x = this.dashTarget.x;
+                this.y = this.dashTarget.y;
+                this.state = 'IDLE';
+                this.stateTimer = 0.5;
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 1.2; // Time spent attacking (telegraph duration usually)
+        
+        const attacks = [
+            this.attackBreath, this.attackFireRain, this.attackClaw, 
+            this.attackDash, this.attackTailSweep, this.attackFireWhirl, this.attackWingGust,
+            this.attackHomingFireballs, this.attackFireballSpread
+        ];
+        const chosen = attacks[Math.floor(Math.random() * attacks.length)];
+        chosen.call(this, player);
+    }
+
+    attackFireballSpread(player) {
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        for (let i = -6; i <= 6; i++) { // Wider spread
+            const angle = baseAngle + (i * 0.12);
+            const proj = new Projectile(this.x, this.y, angle, false, 'fire', 22);
+            proj.speed = 350; // Fly much faster
+            proj.vx = Math.cos(angle) * proj.speed;
+            proj.vy = Math.sin(angle) * proj.speed;
+            game.projectiles.push(proj);
+        }
+        this.stateTimer = 0.8;
+    }
+
+    attackHomingFireballs(player) {
+        this.stateTimer = 3.0; // Boss stays in attacking state while firing
+        for (let i = 0; i < 50; i++) { // More homing balls
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return; // Stop if dead, game reset, or orphaned boss
+                const angle = Math.random() * Math.PI * 2;
+                const proj = new Projectile(this.x, this.y, angle, false, 'fire', 9); // 10% damage increase
+                proj.speed = 220; // Set speed explicitly for homing
+                proj.vx = Math.cos(angle) * proj.speed;
+                proj.vy = Math.sin(angle) * proj.speed;
+                proj.homingTarget = player;
+                proj.lifetime = 5.0; // Lasts 5 seconds
+                proj.maxRange = Infinity; // Ignore player weapon limits
+                game.projectiles.push(proj);
+            }, i * 50); // Faster firing sequence
+        }
+        // Add a visual tell around the boss
+        game.telegraphs.push(new Telegraph('circle', {
+            x: this.x, y: this.y, r: 60
+        }, 3.0, 0, null, '☄️')); // Non-damaging telegraph just for visual effect
+    }
+
+    attackBreath(player) {
+        // Line telegraph towards player
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const endX = this.x + (dx/len) * 800;
+        const endY = this.y + (dy/len) * 800;
+
+        game.telegraphs.push(new Telegraph('line', {
+            x1: this.x, y1: this.y, x2: endX, y2: endY, w: 90
+        }, 1.0, 39, null, '🔥'));
+    }
+
+    attackFireRain(player) {
+        // Spawn random circles, biased towards player (Increased)
+        for (let i = 0; i < 35; i++) {
+            const bx = player.x + (Math.random() - 0.5) * 400;
+            const by = player.y + (Math.random() - 0.5) * 400;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(20, Math.min(ROOM_SIZE-20, bx)), 
+                y: Math.max(20, Math.min(ROOM_SIZE-20, by)), 
+                r: 50
+            }, 0.8 + (i * 0.03), 28, null, '☄️')); // Detonate faster
+        }
+    }
+
+    attackClaw(player) {
+        // Large circle offset towards player
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        
+        const cx = this.x + (dx/len) * 70;
+        const cy = this.y + (dy/len) * 70;
+
+        game.telegraphs.push(new Telegraph('circle', {
+            x: cx, y: cy, r: 100
+        }, 0.6, 44, null, '🐾'));
+        this.stateTimer = 0.6; // Quick attack
+    }
+
+    attackDash(player) {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const dashDist = 450;
+        let endX = this.x + (dx/len) * dashDist;
+        let endY = this.y + (dy/len) * dashDist;
+
+        // Keep inside bounds
+        endX = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, endX));
+        endY = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, endY));
+
+        game.telegraphs.push(new Telegraph('line', {
+            x1: this.x, y1: this.y, x2: endX, y2: endY, w: 80
+        }, 0.8, 55, () => {
+            this.state = 'DASHING';
+            this.dashTarget = {x: endX, y: endY};
+        }, '💨'));
+        this.stateTimer = 0.8;
+    }
+
+    attackTailSweep(player) {
+        // A large ring attack close to the boss
+        game.telegraphs.push(new Telegraph('ring', {
+            x: this.x, y: this.y, innerR: this.radius, outerR: this.radius + 100
+        }, 0.9, 39, null, '🌪️'));
+        this.stateTimer = 0.9;
+    }
+
+    attackFireWhirl(player) {
+        // Spiral of fire circles
+        for (let i = 0; i < 14; i++) {
+            const angle = (i / 14) * Math.PI * 4; // 2 spirals
+            const dist = 80 + i * 20;
+            const bx = this.x + Math.cos(angle) * dist;
+            const by = this.y + Math.sin(angle) * dist;
+            
+            game.telegraphs.push(new Telegraph('circle', {
+                x: bx, y: by, r: 40
+            }, 1.0 + (i * 0.08), 28, null, '🔥'));
+        }
+    }
+
+    attackWingGust(player) {
+        // Massive center AoE
+        game.telegraphs.push(new Telegraph('circle', {
+            x: ROOM_SIZE/2, y: ROOM_SIZE/2, r: 250
+        }, 1.5, 33, null, '🦅'));
+        this.stateTimer = 1.5;
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.facingAngle);
+
+        // Wings
+        let flap = Math.sin(performance.now() / 150) * 0.5;
+        ctx.fillStyle = '#922b21';
+        
+        // Left Wing
+        ctx.beginPath();
+        ctx.moveTo(0, -this.radius*0.5);
+        ctx.lineTo(-this.radius*1.5, -this.radius*1.8 - flap*15);
+        ctx.lineTo(-this.radius*0.8, -this.radius*0.8);
+        ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+
+        // Right Wing
+        ctx.beginPath();
+        ctx.moveTo(0, this.radius*0.5);
+        ctx.lineTo(-this.radius*1.5, this.radius*1.8 + flap*15);
+        ctx.lineTo(-this.radius*0.8, this.radius*0.8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Tail
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(-this.radius*0.8, -this.radius*0.3);
+        ctx.lineTo(-this.radius*2, 0);
+        ctx.lineTo(-this.radius*0.8, this.radius*0.3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Horns
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath(); ctx.moveTo(this.radius*0.5, -this.radius*0.5); ctx.lineTo(this.radius*1.2, -this.radius*0.8); ctx.lineTo(this.radius*0.8, -this.radius*0.2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(this.radius*0.5, this.radius*0.5); ctx.lineTo(this.radius*1.2, this.radius*0.8); ctx.lineTo(this.radius*0.8, this.radius*0.2); ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Boss 4: Naga Snake
+ */
+class NagaBoss extends Boss {
+    constructor(x, y) {
+        super("Venomous Naga", x, y, 2000, 40, '#2ecc71');
+        this.speed = 125;
+        this.hidden = false;
+        
+        this.trail = [];
+        for(let i=0; i<30; i++) this.trail.push({x: this.x, y: this.y + i*5});
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state !== 'DIGGING') {
+            // Only add to trail if actually moving a decent distance to avoid bunching up
+            const distMoved = MathUtils.dist(this.x, this.y, this.trail[0].x, this.trail[0].y);
+            if (distMoved > 2) {
+                this.trail.unshift({x: this.x, y: this.y});
+                if (this.trail.length > 35) this.trail.pop();
+            }
+        }
+
+        if (this.state === 'IDLE') {
+            if(!this.hidden) {
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                this.x += Math.cos(angle) * this.speed * dt;
+                this.y += Math.sin(angle) * this.speed * dt;
+            }
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) this.pickAttack(player);
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.4 + Math.random() * 0.4;
+            }
+        } else if (this.state === 'DIGGING') {
+            this.stateTimer -= dt;
+            if(this.stateTimer <= 0) {
+                this.hidden = false;
+                this.state = 'IDLE';
+                this.stateTimer = 1.0;
+                // Instantly snap trail to new location so it doesn't streak across map
+                this.trail = [];
+                for(let i=0; i<30; i++) this.trail.push({x: this.x, y: this.y});
+            }
+        } else if (this.state === 'CHARGING') {
+            const angle = Math.atan2(this.dashTarget.y - this.y, this.dashTarget.x - this.x);
+            this.x += Math.cos(angle) * 750 * dt;
+            this.y += Math.sin(angle) * 750 * dt;
+
+            // Drop acid pools while charging
+            if (Math.random() < 0.4) {
+                game.telegraphs.push(new Telegraph('circle', {x: this.x, y: this.y, r: 30}, 3.0, 15, null, '🟢'));
+            }
+
+            if (MathUtils.dist(this.x, this.y, this.dashTarget.x, this.dashTarget.y) < 20) {
+                this.x = this.dashTarget.x;
+                this.y = this.dashTarget.y;
+                this.state = 'IDLE';
+                this.stateTimer = 1.0;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0 || this.hidden) return;
+
+        // Draw segmented tail
+        for(let i = this.trail.length - 1; i >= 0; i--) {
+            let p = this.trail[i];
+            let r = this.radius * (1 - (i/40)); // tapers off
+            
+            ctx.fillStyle = '#27ae60';
+            ctx.beginPath(); 
+            ctx.arc(p.x, p.y, Math.max(5, r), 0, Math.PI*2); 
+            ctx.fill();
+            ctx.strokeStyle = '#1e8449'; 
+            ctx.lineWidth = 2; 
+            ctx.stroke();
+        }
+
+        // Draw Head
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Calculate angle from recent history to determine head rotation
+        let angle = 0;
+        if (this.trail.length > 5) {
+            angle = Math.atan2(this.trail[0].y - this.trail[5].y, this.trail[0].x - this.trail[5].x);
+        }
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(angle);
+        
+        // Forked Tongue
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.radius, 0);
+        ctx.lineTo(this.radius + 15, 0);
+        ctx.lineTo(this.radius + 20, -5);
+        ctx.moveTo(this.radius + 15, 0);
+        ctx.lineTo(this.radius + 20, 5);
+        ctx.stroke();
+
+        // Snake Eyes
+        ctx.fillStyle = '#f1c40f'; // Yellow
+        ctx.beginPath(); ctx.arc(10, -12, 5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(10, 12, 5, 0, Math.PI*2); ctx.fill();
+        
+        // Slit pupils
+        ctx.fillStyle = '#000';
+        ctx.fillRect(9, -15, 2, 6);
+        ctx.fillRect(9, 9, 2, 6);
+        
+        ctx.restore();
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 1.5;
+        const r = Math.random();
+        if (r < 0.2) this.attackPoisonBullets(player);
+        else if (r < 0.4) this.attackDig(player);
+        else if (r < 0.6) this.attackAcidRain(player);
+        else if (r < 0.8) this.attackCharge(player);
+        else this.attackVenomVolley(player);
+    }
+
+    attackVenomVolley(player) {
+        // Shoots 5 expanding waves of poison bullets
+        for(let w = 0; w < 5; w++) {
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                for(let i = -2; i <= 2; i++) {
+                    const angle = baseAngle + (i * 0.2) + (Math.random()*0.1 - 0.05);
+                    const proj = new Projectile(this.x, this.y, angle, false, 'poison', 24);
+                    game.projectiles.push(proj);
+                }
+            }, w * 250);
+        }
+        this.stateTimer = 1.0;
+    }
+
+    attackPoisonBullets(player) {
+        for(let i=0; i<24; i++) {
+            const angle = (i / 24) * Math.PI * 2;
+            const proj = new Projectile(this.x, this.y, angle, false, 'poison', 22);
+            game.projectiles.push(proj);
+        }
+    }
+
+    attackDig(player) {
+        this.hidden = true;
+        this.state = 'DIGGING';
+        this.stateTimer = 2.0;
+        const targetX = player.x;
+        const targetY = player.y;
+        game.telegraphs.push(new Telegraph('circle', {x: targetX, y: targetY, r: 80}, 1.9, 55, () => {
+            this.x = targetX;
+            this.y = targetY;
+        }, '💥'));
+    }
+
+    attackAcidRain(player) {
+        for(let i=0; i<20; i++) {
+            const bx = player.x + (Math.random() - 0.5) * 500;
+            const by = player.y + (Math.random() - 0.5) * 500;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(30, Math.min(ROOM_SIZE-30, bx)), 
+                y: Math.max(30, Math.min(ROOM_SIZE-30, by)), 
+                r: 40
+            }, 4.0, 28, null, '🟢'));
+        }
+    }
+
+    attackCharge(player) {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const dashDist = 500;
+        let endX = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, this.x + (dx/len) * dashDist));
+        let endY = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, this.y + (dy/len) * dashDist));
+
+        game.telegraphs.push(new Telegraph('line', {x1: this.x, y1: this.y, x2: endX, y2: endY, w: 60}, 1.0, 44, () => {
+            this.state = 'CHARGING';
+            this.dashTarget = {x: endX, y: endY};
+        }, '🐍'));
+        this.stateTimer = 1.0;
+    }
+}
+
+/**
+ * Boss 5: Bomb Golem
+ */
+class BombGolemBoss extends Boss {
+    constructor(x, y) {
+        super("Bomb Golem", x, y, 2200, 45, '#34495e'); // Increased HP
+        this.speed = 85; // Faster walker and attacks frantically
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state === 'IDLE') {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(angle) * this.speed * dt;
+            this.y += Math.sin(angle) * this.speed * dt;
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                // Very fast cooldown between attacks
+                this.stateTimer = 0.2 + Math.random() * 0.2; 
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 0.8; 
+        
+        const r = Math.random();
+        if (r < 0.2) this.attackBombShower();
+        else if (r < 0.4) this.attackBombThrow(player);
+        else if (r < 0.6) this.attackLargeExplosion();
+        else if (r < 0.8) this.attackBombRain(player);
+        else this.attackBombLine(player);
+    }
+
+    attackBombLine(player) {
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        // 3 spreading lines of bombs instead of 1
+        for (let j = -1; j <= 1; j++) {
+            const angle = baseAngle + (j * 0.3);
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            for(let i = 1; i <= 6; i++) {
+                game.telegraphs.push(new Telegraph('circle', {
+                    x: this.x + dx * (i * 80),
+                    y: this.y + dy * (i * 80),
+                    r: 45
+                }, 0.5 + (i * 0.1), 36, null, '💣'));
+            }
+        }
+        this.stateTimer = 0.8;
+    }
+
+    attackBombShower() {
+        // Clusters of mid-sized explosions around the boss
+        for (let i = 0; i < 20; i++) { // Increased bomb count
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 50 + Math.random() * 250;
+            
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(30, Math.min(ROOM_SIZE-30, this.x + Math.cos(angle) * dist)),
+                y: Math.max(30, Math.min(ROOM_SIZE-30, this.y + Math.sin(angle) * dist)),
+                r: 45
+            }, 0.6 + Math.random() * 0.5, 33, null, '💣')); // Faster detonation
+        }
+    }
+
+    attackBombThrow(player) {
+        // Throw bomb projectiles in a spread that leave explosive telegraphs when they hit
+        for(let i=-3; i<=3; i++) { // Increased spread
+            const angle = Math.atan2(player.y - this.y, player.x - this.x) + (i * 0.2);
+            const proj = new Projectile(this.x, this.y, angle, false, 'bomb', 17);
+            proj.speed = 450; // Fly much faster
+            proj.vx = Math.cos(angle) * proj.speed;
+            proj.vy = Math.sin(angle) * proj.speed;
+            
+            // Custom update: When it dies, spawn an explosion telegraph
+            const ogUpdate = proj.update.bind(proj);
+            proj.update = (dt, room) => {
+                ogUpdate(dt, room);
+                if (!proj.active) { 
+                    game.telegraphs.push(new Telegraph('circle', {
+                        x: proj.x, y: proj.y, r: 70
+                    }, 0.5, 44, null, '💥')); // Faster explosion
+                }
+            };
+            game.projectiles.push(proj);
+        }
+    }
+
+    attackLargeExplosion() {
+        // A single massive central blast
+        game.telegraphs.push(new Telegraph('circle', {
+            x: this.x, y: this.y, r: 240 // Larger blast
+        }, 0.9, 55, null, '☢️')); // Detonates faster
+        this.stateTimer = 0.9;
+    }
+
+    attackBombRain(player) {
+        // Rapid sequence of explosions targeting player area
+        for (let i = 0; i < 24; i++) { // More bombs
+            const bx = player.x + (Math.random() - 0.5) * 400; // Wider spread
+            const by = player.y + (Math.random() - 0.5) * 400;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(30, Math.min(ROOM_SIZE-30, bx)), 
+                y: Math.max(30, Math.min(ROOM_SIZE-30, by)), 
+                r: 45 // Slightly larger radius
+            }, 0.3 + (i * 0.08), 33, null, '💣')); // Faster sequential drop
+        }
+        this.stateTimer = 0.8;
+    }
+    
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = this.color;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Hexagon shape for bomb golem
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI) / 3;
+            const px = Math.cos(angle) * this.radius;
+            const py = Math.sin(angle) * this.radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2c3e50'; // Darker metallic casing
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Inner bomb ring
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.6, 0, Math.PI*2); ctx.fill();
+
+        // Lit fuse moving around
+        let fuseAngle = (performance.now() / 200) % (Math.PI * 2);
+        let fx = Math.cos(fuseAngle) * this.radius * 0.8;
+        let fy = Math.sin(fuseAngle) * this.radius * 0.8;
+        
+        ctx.fillStyle = '#e74c3c'; // Fire
+        ctx.beginPath(); ctx.arc(fx, fy, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#f1c40f'; // Spark
+        ctx.beginPath(); ctx.arc(fx, fy, 4, 0, Math.PI*2); ctx.fill();
+        
+        // Connecting fuse wire
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(fx, fy); ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Boss 6: Shadow Samurai
+ */
+class SamuraiBoss extends Boss {
+    constructor(x, y) {
+        super("Shadow Samurai", x, y, 3500, 25, '#2c3e50'); // A frick ton of health, smaller radius
+        this.speed = 130;
+        this.dashCount = 0;
+        this.isTeleporting = false;
+        this.spikeCooldown = 0;
+        this.facingAngle = 0;
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+        
+        if (this.spikeCooldown > 0) this.spikeCooldown -= dt;
+
+        if (!this.isTeleporting) {
+            for (const spike of game.room.spikes) {
+                if (MathUtils.dist(this.x, this.y, spike.x, spike.y) < this.radius + spike.r) {
+                    if (this.spikeCooldown <= 0) {
+                        this.takeDamage(100); // Reduced damage from 250
+                        this.spikeCooldown = 0.5;
+                        const t = new Telegraph('circle', {x: this.x, y: this.y, r: this.radius*1.5}, 0.2, 0, null, '🩸');
+                        t.resolved = true;
+                        game.telegraphs.push(t);
+                    }
+                }
+            }
+        }
+
+        if (this.isTeleporting) return;
+
+        if (this.state === 'IDLE') {
+            this.facingAngle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(this.facingAngle) * this.speed * dt;
+            this.y += Math.sin(this.facingAngle) * this.speed * dt;
+            
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) this.pickAttack(player);
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.4 + Math.random() * 0.3;
+            }
+        } else if (this.state === 'DASHING') {
+            this.facingAngle = Math.atan2(this.dashTarget.y - this.y, this.dashTarget.x - this.x);
+            const step = 1400 * dt; // VERY fast dash
+            const dist = MathUtils.dist(this.x, this.y, this.dashTarget.x, this.dashTarget.y);
+            
+            if (dist < step || dist < 30) {
+                this.x = this.dashTarget.x;
+                this.y = this.dashTarget.y;
+                this.dashCount--;
+                if (this.dashCount > 0) {
+                    this.state = 'ATTACKING'; // Wait for next telegraph properly
+                    this.performDash(game.player); // Use latest player reference
+                } else {
+                    this.state = 'IDLE';
+                    this.stateTimer = 0.6;
+                }
+            } else {
+                this.x += Math.cos(this.facingAngle) * step;
+                this.y += Math.sin(this.facingAngle) * step;
+            }
+        }
+    }
+    
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 0.8;
+        
+        const dist = MathUtils.dist(this.x, this.y, player.x, player.y);
+        const r = Math.random();
+        
+        // Proximity Based Logic
+        if (dist < 120) {
+            if (r < 0.4) this.attackMelee(player);
+            else if (r < 0.7) this.attackTeleport(player);
+            else this.attackLightningSlash();
+        } else {
+            if (r < 0.3) this.attackAirSlash(player);
+            else if (r < 0.6) this.initComboDash(player);
+            else if (r < 0.8) this.attackKunaiThrow(player);
+            else this.attackLightningSlash();
+        }
+    }
+
+    attackKunaiThrow(player) {
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        for(let i = -3; i <= 3; i++) {
+            const angle = baseAngle + (i * 0.1);
+            const proj = new Projectile(this.x, this.y, angle, false, 'slash', 28);
+            proj.radius = 8;
+            proj.speed = 600; // very fast
+            proj.vx = Math.cos(angle) * proj.speed;
+            proj.vy = Math.sin(angle) * proj.speed;
+            game.projectiles.push(proj);
+        }
+        this.stateTimer = 0.6;
+    }
+
+    attackMelee(player) {
+        // Devastating instant 360 slash
+        game.telegraphs.push(new Telegraph('circle', {x: this.x, y: this.y, r: 120}, 0.4, 55, null, '⚔️'));
+        this.stateTimer = 0.5;
+    }
+
+    attackAirSlash(player) {
+        // Shoots 3 fast, wide projectiles
+        const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        for(let i = -1; i <= 1; i++) {
+            const angle = baseAngle + (i * 0.25);
+            const proj = new Projectile(this.x, this.y, angle, false, 'slash', 28);
+            game.projectiles.push(proj);
+        }
+        this.stateTimer = 0.7;
+    }
+
+    attackLightningSlash() {
+        // 5 fast criss-crossing lines across the entire arena
+        this.stateTimer = 1.0;
+        for(let i=0; i<5; i++) {
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const isHorizontal = Math.random() > 0.5;
+                let x1, y1, x2, y2;
+                if (isHorizontal) {
+                    y1 = y2 = Math.random() * ROOM_SIZE;
+                    x1 = 0; x2 = ROOM_SIZE;
+                } else {
+                    x1 = x2 = Math.random() * ROOM_SIZE;
+                    y1 = 0; y2 = ROOM_SIZE;
+                }
+                game.telegraphs.push(new Telegraph('line', {x1, y1, x2, y2, w: 50}, 0.5, 44, null, '⚡'));
+            }, i * 150);
+        }
+    }
+
+    initComboDash(player) {
+        this.dashCount = 3; // 3-Hit Combo Dash
+        this.performDash(player);
+    }
+
+    performDash(player) {
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        const dashDist = 450;
+        let endX = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, this.x + Math.cos(angle) * dashDist));
+        let endY = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, this.y + Math.sin(angle) * dashDist));
+
+        game.telegraphs.push(new Telegraph('line', {x1: this.x, y1: this.y, x2: endX, y2: endY, w: 70}, 0.5, 49, () => {
+            this.state = 'DASHING';
+            this.dashTarget = {x: endX, y: endY};
+        }, '💨'));
+        this.stateTimer = 1.0; 
+    }
+
+    attackTeleport(player) {
+        this.isTeleporting = true;
+        this.stateTimer = 1.5;
+        
+        // Leave a decoy/telegraph where he was
+        game.telegraphs.push(new Telegraph('circle', {x: this.x, y: this.y, r: 40}, 0.4, 0, () => {
+            if (this.hp <= 0 || game.room.boss !== this) return;
+            
+            // Reappear directly on top of the player
+            const offsetAngle = Math.random() * Math.PI * 2;
+            this.x = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, player.x + Math.cos(offsetAngle) * 50));
+            this.y = Math.max(this.radius, Math.min(ROOM_SIZE - this.radius, player.y + Math.sin(offsetAngle) * 50));
+            this.isTeleporting = false;
+            
+            // Immediately follow up with a deadly Melee slice
+            this.attackMelee(player);
+        }, '🥷'));
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0 || this.isTeleporting) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.rotate(this.facingAngle);
+
+        // Katana Sword
+        ctx.fillStyle = '#bdc3c7'; // Blade
+        ctx.fillRect(this.radius * 0.8, -4, 40, 8);
+        ctx.fillStyle = '#c0392b'; // Hilt/Handguard
+        ctx.fillRect(this.radius * 0.6, -8, 8, 16);
+        ctx.beginPath(); // Tip
+        ctx.moveTo(this.radius * 0.8 + 40, -4);
+        ctx.lineTo(this.radius * 0.8 + 48, 0);
+        ctx.lineTo(this.radius * 0.8 + 40, 4);
+        ctx.fill();
+
+        ctx.restore();
+        
+        // Draw Samurai Straw Hat on top
+        ctx.fillStyle = '#f39c12';
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, this.radius * 1.4, this.radius * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#d35400';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+}
+
+/**
+ * Boss 7: The Admin
+ */
+class AdminBoss extends Boss {
+    constructor(x, y) {
+        super("The Admin", x, y, 12000, 40, '#000000'); // Ultimate HP and tiny hitbox
+        this.speed = 300; // Extremely fast passive movement
+        this.phase = 1;
+        this.moveAngle = Math.random() * Math.PI * 2;
+    }
+
+    takeDamage(amt) {
+        if (this.hp <= 0) return;
+        this.hp -= amt;
+        this.updateHealthUI();
+        if (this.hp <= 0) {
+            if (this.phase === 1) {
+                this.phase = 2;
+                this.hp = this.maxHp; // Full heal!
+                this.updateHealthUI();
+                this.name = "The Admin (Phase 2)";
+                document.getElementById('boss-health-text').innerText = this.name;
+                this.speed = 450; // Insanely fast
+                
+                // Screen wipe effect
+                const t = new Telegraph('circle', {x: ROOM_SIZE/2, y: ROOM_SIZE/2, r: ROOM_SIZE}, 0.5, 0, null, '⚠️');
+                t.resolved = true;
+                game.telegraphs.push(t);
+
+                // Phase 2 transition dialogue pauses the fight and gives a free upgrade!
+                game.playDialogue([
+                    {speaker: 'The Admin (Phase 2)', text: 'NICE TRY, MALWARE.'},
+                    {speaker: 'System', text: 'SYSTEM OVERRIDE INITIATED. FULL RESTORE & UPGRADE GRANTED.'}
+                ], () => {
+                    game.player.hp = game.player.maxHp; // Heal to full!
+                    game.player.takeDamage(0); // Update UI
+                    game.pendingUpgrades = 1;
+                    game.showUpgrades(); // Pop open the upgrade menu
+                    this.stateTimer = 1.0;
+                });
+
+            } else {
+                this.hp = 0;
+                this.die();
+            }
+        }
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state === 'IDLE') {
+            if (this.moveAngle === undefined) this.moveAngle = Math.random() * Math.PI * 2;
+            
+            // Randomly veer slightly
+            if (Math.random() < 0.05) this.moveAngle += (Math.random() - 0.5) * Math.PI;
+
+            let nx = this.x + Math.cos(this.moveAngle) * this.speed * dt;
+            let ny = this.y + Math.sin(this.moveAngle) * this.speed * dt;
+
+            // Bounce off edges (ROOM_SIZE for Admin is 1000)
+            if (nx < this.radius || nx > ROOM_SIZE - this.radius) {
+                this.moveAngle = Math.PI - this.moveAngle;
+                nx = this.x + Math.cos(this.moveAngle) * this.speed * dt;
+            }
+            if (ny < this.radius || ny > ROOM_SIZE - this.radius) {
+                this.moveAngle = -this.moveAngle;
+                ny = this.y + Math.sin(this.moveAngle) * this.speed * dt;
+            }
+
+            this.x = nx;
+            this.y = ny;
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                // Moderated attack cooldown (slightly slower)
+                this.stateTimer = 0.15 + Math.random() * 0.2; 
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 0.4; // Keeps boss moving between telegraphs
+        
+        const r = Math.random();
+        if (this.phase === 2 && r < 0.20 && document.getElementById('fake-ad').classList.contains('hidden')) {
+            this.attackFakeAd();
+        } else if (r < 0.2) this.attackHackGround(player);
+        else if (r < 0.4) this.attackMissileSwarm(player);
+        else if (r < 0.6) this.attackGlitchExplosions(player);
+        else if (r < 0.8) this.attackLaserGrid();
+        else this.attackDataStream(player); 
+    }
+
+    attackFakeAd() {
+        document.getElementById('fake-ad').classList.remove('hidden');
+        this.stateTimer = 1.0;
+    }
+
+    attackHackGround(player) {
+        // Spawns lingering Hazard zones randomly around the player
+        for(let i=0; i<8; i++) { // Increased
+            const hx = player.x + (Math.random()-0.5)*500;
+            const hy = player.y + (Math.random()-0.5)*500;
+            const size = 100;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(size, Math.min(ROOM_SIZE-size, hx)), 
+                y: Math.max(size, Math.min(ROOM_SIZE-size, hy)), 
+                r: size
+            }, 0.8, 10, () => {
+                // When telegraph resolves, spawn DOT hazard for 8 seconds
+                if (this.hp > 0 && game.state === 'PLAYING') {
+                    game.hazards.push(new Hazard(hx, hy, size, 8.0, 18, 'rgba(0, 255, 0, 0.4)'));
+                }
+            }, '💻'));
+        }
+    }
+
+    attackMissileSwarm(player) {
+        // Massive super-fast swarm
+        for (let i = 0; i < 40; i++) { // Increased
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const angle = Math.random() * Math.PI * 2;
+                const proj = new Projectile(this.x, this.y, angle, false, 'bomb', 20);
+                proj.speed = 180; 
+                proj.vx = Math.cos(angle) * proj.speed;
+                proj.vy = Math.sin(angle) * proj.speed;
+                proj.homingTarget = player;
+                proj.lifetime = 4.0;
+                proj.maxRange = Infinity;
+                
+                const ogUpdate = proj.update.bind(proj);
+                proj.update = (dt, room) => {
+                    ogUpdate(dt, room);
+                    if (!proj.active) {
+                        game.telegraphs.push(new Telegraph('circle', {x: proj.x, y: proj.y, r: 80}, 0.4, 40, null, '💥'));
+                    }
+                };
+                game.projectiles.push(proj);
+            }, i * 60); 
+        }
+    }
+
+    attackGlitchExplosions(player) {
+        // Spawn massive explosion rain everywhere immediately
+        for (let i = 0; i < 40; i++) { // Increased
+            const bx = player.x + (Math.random() - 0.5) * 800;
+            const by = player.y + (Math.random() - 0.5) * 800;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(40, Math.min(ROOM_SIZE-40, bx)), 
+                y: Math.max(40, Math.min(ROOM_SIZE-40, by)), 
+                r: 60
+            }, 0.4 + (i * 0.05), 45, null, '☠️'));
+        }
+    }
+
+    attackLaserGrid() {
+        // Unescapable Grid - much faster and more dense
+        for(let i = 1; i < 8; i++) {
+            const y = (ROOM_SIZE / 8) * i;
+            game.telegraphs.push(new Telegraph('line', {
+                x1: 0, y1: y, x2: ROOM_SIZE, y2: y, w: 45
+            }, 0.8, 50, null, '⚡'));
+        }
+        for(let i = 1; i < 8; i++) {
+            const x = (ROOM_SIZE / 8) * i;
+            game.telegraphs.push(new Telegraph('line', {
+                x1: x, y1: 0, x2: x, y2: ROOM_SIZE, w: 45
+            }, 0.8, 50, null, '⚡'));
+        }
+    }
+
+    attackDataStream(player) {
+        // Enormous beam replacing Dragon Breath
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const endX = this.x + (dx/len) * 1500;
+        const endY = this.y + (dy/len) * 1500;
+
+        game.telegraphs.push(new Telegraph('line', {
+            x1: this.x, y1: this.y, x2: endX, y2: endY, w: 200
+        }, 1.2, 80, null, '💻'));
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        
+        // Draw glitchy matrix boss
+        if (this.phase === 1) {
+            ctx.fillStyle = (Math.random() > 0.8) ? '#ff0000' : (Math.random() > 0.5 ? '#00ff00' : '#0000ff');
+        } else {
+            ctx.fillStyle = (Math.random() > 0.5) ? '#ffffff' : '#ff0000'; // Phase 2 is more aggressive red/white
+        }
+        ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+    }
+}
+
+/**
+ * Boss 8: Lab Core
+ */
+class LabCoreBoss extends Boss {
+    constructor(x, y) {
+        super("Lab Core", x, y, 9999, 60, '#9b59b6');
+        this.phase = 'GENERATORS';
+        this.generators = [
+            {x: 100, y: 100, r: 35, active: true},
+            {x: 700, y: 100, r: 35, active: true},
+            {x: 100, y: 700, r: 35, active: true},
+            {x: 700, y: 700, r: 35, active: true}
+        ];
+        // Moved button up slightly so it doesn't clip into the pillars below it!
+        // Changed HP to 150 (roughly 30 base attacks) so it correctly scales with player damage upgrades.
+        this.button = {x: ROOM_SIZE/2 - 100, y: ROOM_SIZE/2 + 80, w: 200, h: 60, hp: 150, maxHp: 150, active: false};
+        this.mysteryDisappeared = false;
+        
+        // Boss is immune to normal damage
+        setTimeout(() => document.getElementById('boss-health').classList.add('hidden'), 10);
+    }
+
+    takeDamage(amt) { /* Immune to normal attacks */ }
+    updateHealthUI() { /* Hidden */ }
+
+    update(dt, player) {
+        if (this.phase === 'ENDING') return;
+
+        // Ensure Special Missile exists during GENERATORS phase
+        if (this.phase === 'GENERATORS') {
+            let hasMissile = game.projectiles.some(p => p.type === 'special_missile');
+            if (!hasMissile && Math.random() < 0.05) {
+                this.fireSpecialMissile(player);
+            }
+        }
+        
+        // Periodically spawn buffs
+        this.buffSpawnTimer = (this.buffSpawnTimer || 0) - dt;
+        if (this.buffSpawnTimer <= 0) {
+            this.buffSpawnTimer = 1.5; // Spawn a buff every 1.5 seconds
+            let type = Math.random() < 0.5 ? 'health' : 'speed';
+            let cx = 100 + Math.random() * (ROOM_SIZE - 200);
+            let cy = 100 + Math.random() * (ROOM_SIZE - 200);
+            if (game) game.collectibles.push(new Collectible(cx, cy, type));
+        }
+
+        this.stateTimer -= dt;
+        if (this.stateTimer <= 0) {
+            this.pickAttack(player);
+        }
+    }
+
+    fireSpecialMissile(player) {
+        const angle = Math.random() * Math.PI * 2;
+        const proj = new Projectile(this.x, this.y, angle, false, 'special_missile', 20);
+        proj.speed = 130;
+        proj.radius = 18;
+        proj.vx = Math.cos(angle) * proj.speed;
+        proj.vy = Math.sin(angle) * proj.speed;
+        proj.homingTarget = player;
+        proj.maxRange = Infinity;
+        game.projectiles.push(proj);
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 1.5;
+        
+        const r = Math.random();
+        if (r < 0.25) this.attackShockwave();
+        else if (r < 0.5) this.attackDisappearingFloor();
+        else if (r < 0.75) this.attackLasers();
+        else this.attackHomingBombs(player);
+    }
+
+    attackShockwave() {
+        game.telegraphs.push(new Telegraph('ring', {x: this.x, y: this.y, innerR: 0, outerR: 300}, 1.5, 30, null, '🌊'));
+        game.telegraphs.push(new Telegraph('ring', {x: this.x, y: this.y, innerR: 300, outerR: 600}, 2.0, 30, null, '🌊'));
+    }
+
+    attackDisappearingFloor() {
+        const safeIndex = Math.floor(Math.random() * 4);
+        const quadrants = [
+            {x: 0, y: 0, w: ROOM_SIZE/2, h: ROOM_SIZE/2},
+            {x: ROOM_SIZE/2, y: 0, w: ROOM_SIZE/2, h: ROOM_SIZE/2},
+            {x: 0, y: ROOM_SIZE/2, w: ROOM_SIZE/2, h: ROOM_SIZE/2},
+            {x: ROOM_SIZE/2, y: ROOM_SIZE/2, w: ROOM_SIZE/2, h: ROOM_SIZE/2}
+        ];
+        
+        for(let i=0; i<4; i++) {
+            if (i !== safeIndex) {
+                game.telegraphs.push(new Telegraph('rect', quadrants[i], 2.5, 40, null, '⚠️'));
+            }
+        }
+        this.stateTimer = 2.5;
+    }
+
+    attackLasers() {
+        // Star pattern
+        for(let i = 0; i < 4; i++) {
+            const angle = (i * Math.PI) / 4;
+            const dx = Math.cos(angle) * ROOM_SIZE;
+            const dy = Math.sin(angle) * ROOM_SIZE;
+            game.telegraphs.push(new Telegraph('line', {
+                x1: this.x - dx, y1: this.y - dy, 
+                x2: this.x + dx, y2: this.y + dy, w: 50
+            }, 1.5, 45, null, '⚡'));
+        }
+    }
+
+    attackHomingBombs(player) {
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                if (this.phase === 'ENDING' || game.state !== 'PLAYING') return;
+                const angle = Math.random() * Math.PI * 2;
+                const proj = new Projectile(this.x, this.y, angle, false, 'bomb', 25);
+                proj.speed = 160; 
+                proj.vx = Math.cos(angle) * proj.speed; proj.vy = Math.sin(angle) * proj.speed;
+                proj.homingTarget = player; proj.lifetime = 4.0; proj.maxRange = Infinity;
+                
+                const ogUpdate = proj.update.bind(proj);
+                proj.update = (dt, room) => {
+                    ogUpdate(dt, room);
+                    if (!proj.active) game.telegraphs.push(new Telegraph('circle', {x: proj.x, y: proj.y, r: 80}, 0.5, 40, null, '💥'));
+                };
+                game.projectiles.push(proj);
+            }, i * 200); 
+        }
+    }
+
+    startEndingCutscene() {
+        this.phase = 'ENDING';
+        game.projectiles = []; // Clear danger
+        game.telegraphs = [];
+        
+        // Massive Core Explosion!
+        if (game) {
+            game.spawnParticles(this.x, this.y, '#9b59b6', 200, 500, 2.0, 6);
+            game.spawnParticles(this.x, this.y, '#ffffff', 100, 600, 1.0, 4);
+        }
+        
+        this.color = '#333'; // Turn the core dark/dead
+        
+        game.playDialogue([
+            {speaker: 'Friend', text: 'You found me... thank you.'},
+            {speaker: 'Mysterious Person', text: "The core is shattered. But the system's true architect remains hidden."},
+            {speaker: 'Player', text: 'Who are you?'},
+            {speaker: 'Mysterious Person', text: '...'}
+        ], () => {
+            this.mysteryDisappeared = true;
+            if (game) game.spawnParticles(ROOM_SIZE/2 + 30, ROOM_SIZE/2 + 50, '#8e44ad', 50, 150, 1.0, 3); // Teleport effect
+            setTimeout(() => {
+                this.hp = 0;
+                document.getElementById('boss-health').classList.add('hidden');
+                
+                // Trigger the God Slayer win immediately instead of waiting for a portal!
+                if (game) game.gameWin(1); 
+            }, 1500);
+        });
+    }
+
+    draw(ctx) {
+        // Draw Core
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        for(let i=0; i<8; i++) {
+            const angle = (i * Math.PI)/4 + performance.now()/1000;
+            const r = (i%2 === 0) ? this.radius : this.radius*0.7;
+            const px = this.x + Math.cos(angle)*r;
+            const py = this.y + Math.sin(angle)*r;
+            if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = this.phase === 'ENDING' ? '#111' : '#8e44ad'; 
+        ctx.lineWidth = 4; ctx.stroke();
+        
+        // Inner gears
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius*0.5, 0, Math.PI*2); ctx.fill();
+        
+        // Stop pulsing if dead
+        if (this.phase !== 'ENDING') {
+            ctx.fillStyle = '#e74c3c';
+            let corePulsing = Math.sin(performance.now()/150) * 5;
+            ctx.beginPath(); ctx.arc(this.x, this.y, 10 + corePulsing, 0, Math.PI*2); ctx.fill();
+        }
+
+        // Draw Generators
+        if (this.phase === 'GENERATORS') {
+            for (let g of this.generators) {
+                if (g.active) {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 3; ctx.stroke();
+                    ctx.fillStyle = '#000'; ctx.font = '16px Arial'; ctx.textAlign = 'center';
+                    ctx.fillText('⚡', g.x, g.y + 5);
+                }
+            }
+        }
+
+        // Draw Button
+        if (this.phase === 'BUTTON' && this.button.active) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(this.button.x, this.button.y, this.button.w, this.button.h);
+            ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 4;
+            ctx.strokeRect(this.button.x, this.button.y, this.button.w, this.button.h);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText("FREE PRISONERS", this.button.x + this.button.w/2, this.button.y + 25);
+            ctx.font = '14px Arial';
+            // Show structural integrity properly now that damage varies
+            ctx.fillText(`Integrity: ${Math.ceil(Math.max(0, this.button.hp))} / ${this.button.maxHp}`, this.button.x + this.button.w/2, this.button.y + 45);
+        }
+
+        // Draw Cutscene Characters
+        if (this.phase === 'ENDING') {
+            // Draw Friend
+            ctx.fillStyle = '#ffb8b8';
+            ctx.beginPath(); ctx.arc(ROOM_SIZE/2 - 30, ROOM_SIZE/2 + 50, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#e74c3c'; ctx.fillRect(ROOM_SIZE/2 - 35, ROOM_SIZE/2 + 38, 10, 4);
+            
+            // Draw Mystery Person
+            if (!this.mysteryDisappeared) {
+                ctx.fillStyle = '#333';
+                ctx.beginPath(); ctx.arc(ROOM_SIZE/2 + 30, ROOM_SIZE/2 + 50, 10, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#fff'; // glowing eyes
+                ctx.fillRect(ROOM_SIZE/2 + 25, ROOM_SIZE/2 + 48, 3, 3);
+                ctx.fillRect(ROOM_SIZE/2 + 32, ROOM_SIZE/2 + 48, 3, 3);
+            }
+        }
+    }
+}
+
+/**
+ * Boss 9: True Admin (Bonus Challenge)
+ */
+class TrueAdminBoss extends Boss {
+    constructor(x, y) {
+        super("The Admin (True Form)", x, y, 60000, 60, '#ff00ff'); // 10x Health
+        this.speed = 300; // Unrelenting speed
+    }
+
+    update(dt, player) {
+        if (this.hp <= 0) return;
+
+        if (this.state === 'IDLE') {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(angle) * this.speed * dt;
+            this.y += Math.sin(angle) * this.speed * dt;
+
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.pickAttack(player);
+            }
+        } else if (this.state === 'ATTACKING') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.state = 'IDLE';
+                this.stateTimer = 0.05; // Immediate attack chaining
+            }
+        }
+    }
+
+    pickAttack(player) {
+        this.state = 'ATTACKING';
+        this.stateTimer = 0.3; // Extremely fast telegraph cycles
+        
+        const r = Math.random();
+        if (r < 0.15 && document.getElementById('fake-ad').classList.contains('hidden')) {
+            this.attackFakeAd();
+            this.attackGlitchExplosions(player); // Multitasking
+        } else if (r < 0.3) this.attackHackGround(player);
+        else if (r < 0.5) this.attackMissileSwarm(player);
+        else if (r < 0.7) this.attackGlitchExplosions(player);
+        else if (r < 0.85) this.attackLaserGrid();
+        else this.attackDataStar(player); 
+    }
+
+    attackFakeAd() {
+        document.getElementById('fake-ad').classList.remove('hidden');
+    }
+
+    attackHackGround(player) {
+        // Massive floor denial
+        for(let i=0; i<15; i++) {
+            const hx = player.x + (Math.random()-0.5)*800;
+            const hy = player.y + (Math.random()-0.5)*800;
+            const size = 150;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(size, Math.min(ROOM_SIZE-size, hx)), y: Math.max(size, Math.min(ROOM_SIZE-size, hy)), r: size
+            }, 0.5, 30, () => {
+                if (this.hp > 0 && game.state === 'PLAYING') game.hazards.push(new Hazard(hx, hy, size, 5.0, 40, 'rgba(255, 0, 255, 0.5)'));
+            }, '☣️'));
+        }
+    }
+
+    attackMissileSwarm(player) {
+        for (let i = 0; i < 60; i++) { // 60 Swarm Missiles
+            setTimeout(() => {
+                if (this.hp <= 0 || game.state !== 'PLAYING' || game.room.boss !== this) return;
+                const angle = Math.random() * Math.PI * 2;
+                const proj = new Projectile(this.x, this.y, angle, false, 'bomb', 35);
+                proj.speed = 350; 
+                proj.vx = Math.cos(angle) * proj.speed; proj.vy = Math.sin(angle) * proj.speed;
+                proj.homingTarget = player; proj.lifetime = 5.0; proj.maxRange = Infinity;
+                
+                const ogUpdate = proj.update.bind(proj);
+                proj.update = (dt, room) => {
+                    ogUpdate(dt, room);
+                    if (!proj.active) game.telegraphs.push(new Telegraph('circle', {x: proj.x, y: proj.y, r: 100}, 0.3, 50, null, '💥'));
+                };
+                game.projectiles.push(proj);
+            }, i * 40); // Rapid fire
+        }
+    }
+
+    attackGlitchExplosions(player) {
+        // 100 explosions blanketing the arena
+        for (let i = 0; i < 100; i++) {
+            const bx = player.x + (Math.random() - 0.5) * 1000;
+            const by = player.y + (Math.random() - 0.5) * 1000;
+            game.telegraphs.push(new Telegraph('circle', {
+                x: Math.max(40, Math.min(ROOM_SIZE-40, bx)), y: Math.max(40, Math.min(ROOM_SIZE-40, by)), r: 80
+            }, 0.3 + (i * 0.02), 60, null, '☠️'));
+        }
+    }
+
+    attackLaserGrid() {
+        // 10x10 Grid, leaving almost no safe spots
+        for(let i = 1; i < 10; i++) {
+            const y = (ROOM_SIZE / 10) * i;
+            game.telegraphs.push(new Telegraph('line', {x1: 0, y1: y, x2: ROOM_SIZE, y2: y, w: 60}, 0.6, 80, null, '⚡'));
+        }
+        for(let i = 1; i < 10; i++) {
+            const x = (ROOM_SIZE / 10) * i;
+            game.telegraphs.push(new Telegraph('line', {x1: x, y1: 0, x2: x, y2: ROOM_SIZE, w: 60}, 0.6, 80, null, '⚡'));
+        }
+    }
+
+    attackDataStar(player) {
+        // 4 massive beams targeting directly on the player's current location!
+        const px = player.x, py = player.y;
+        game.telegraphs.push(new Telegraph('line', {x1: 0, y1: py, x2: ROOM_SIZE, y2: py, w: 120}, 0.8, 100, null, '💻'));
+        game.telegraphs.push(new Telegraph('line', {x1: px, y1: 0, x2: px, y2: ROOM_SIZE, w: 120}, 0.8, 100, null, '💻'));
+        game.telegraphs.push(new Telegraph('line', {x1: px - 1200, y1: py - 1200, x2: px + 1200, y2: py + 1200, w: 120}, 0.8, 100, null, '💻'));
+        game.telegraphs.push(new Telegraph('line', {x1: px - 1200, y1: py + 1200, x2: px + 1200, y2: py - 1200, w: 120}, 0.8, 100, null, '💻'));
+    }
+
+    draw(ctx) {
+        if (this.hp <= 0) return;
+        ctx.fillStyle = (Math.random() > 0.5) ? '#ff00ff' : '#000000'; // Pulsing Magenta/Black
+        ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+    }
+}
+
+/**
+ * Room / Level Management
+ */
+class Room {
+    constructor(bossClass) {
+        this.walls = [];
+        this.pillars = [];
+        this.spikes = [];
+        this.cleared = false;
+        
+        // Initialize Boss
+        this.boss = bossClass ? new bossClass(ROOM_SIZE/2, ROOM_SIZE/4) : null;
+        
+        if (this.boss instanceof TutorialDirector) {
+            // Street layout
+            this.walls.push({x: 0, y: 0, w: 50, h: ROOM_SIZE}); // Left building/sidewalk
+            this.walls.push({x: ROOM_SIZE-50, y: 0, w: 50, h: ROOM_SIZE}); // Right building/sidewalk
+            this.walls.push({x: 0, y: ROOM_SIZE-GRID_CELL_SIZE, w: ROOM_SIZE, h: GRID_CELL_SIZE}); // Bottom boundary
+            this.walls.push({x: 0, y: 0, w: ROOM_SIZE, h: 50}); // Top boundary
+        } else {
+            // Standard Boundary walls
+            this.walls.push({x: 0, y: 0, w: ROOM_SIZE, h: GRID_CELL_SIZE});
+            this.walls.push({x: 0, y: ROOM_SIZE-GRID_CELL_SIZE, w: ROOM_SIZE, h: GRID_CELL_SIZE});
+            this.walls.push({x: 0, y: 0, w: GRID_CELL_SIZE, h: ROOM_SIZE});
+            this.walls.push({x: ROOM_SIZE-GRID_CELL_SIZE, y: 0, w: GRID_CELL_SIZE, h: ROOM_SIZE});
+        }
+        
+        // Setup obstacles based on boss type (using relative scaling)
+        if (this.boss instanceof RobotBoss) {
+            // Room 1: Symmetrical pillars to hide from lasers/bullets
+            this.pillars.push({x: ROOM_SIZE*0.33, y: ROOM_SIZE*0.33, r: 35});
+            this.pillars.push({x: ROOM_SIZE*0.66, y: ROOM_SIZE*0.33, r: 35});
+            this.pillars.push({x: ROOM_SIZE*0.33, y: ROOM_SIZE*0.66, r: 35});
+            this.pillars.push({x: ROOM_SIZE*0.66, y: ROOM_SIZE*0.66, r: 35});
+        } else if (this.boss instanceof GolemBoss) {
+            // Room 2: some scattered wall blocks
+            this.walls.push({x: ROOM_SIZE*0.25, y: ROOM_SIZE*0.33, w: 60, h: 60});
+            this.walls.push({x: ROOM_SIZE*0.75 - 60, y: ROOM_SIZE*0.33, w: 60, h: 60});
+            this.walls.push({x: ROOM_SIZE/2 - 30, y: ROOM_SIZE*0.75, w: 60, h: 60});
+        } else if (this.boss instanceof DragonBoss) {
+            // Room 3: 4 Pillars in corners
+            this.pillars.push({x: ROOM_SIZE*0.16, y: ROOM_SIZE*0.16, r: 30});
+            this.pillars.push({x: ROOM_SIZE*0.84, y: ROOM_SIZE*0.16, r: 30});
+            this.pillars.push({x: ROOM_SIZE*0.16, y: ROOM_SIZE*0.84, r: 30});
+            this.pillars.push({x: ROOM_SIZE*0.84, y: ROOM_SIZE*0.84, r: 30});
+        } else if (this.boss instanceof NagaBoss) {
+            // Room 4: Changed central pillar into two offset pillars so it doesn't block the center portal
+            this.pillars.push({x: ROOM_SIZE/2 - ROOM_SIZE*0.15, y: ROOM_SIZE/2, r: 40});
+            this.pillars.push({x: ROOM_SIZE/2 + ROOM_SIZE*0.15, y: ROOM_SIZE/2, r: 40});
+            this.walls.push({x: ROOM_SIZE*0.16, y: ROOM_SIZE*0.5, w: 80, h: 20});
+            this.walls.push({x: ROOM_SIZE*0.84 - 80, y: ROOM_SIZE*0.5, w: 80, h: 20});
+        } else if (this.boss instanceof BombGolemBoss) {
+            // Room 5: 4 small walls acting as bomb shields around the edge
+            this.walls.push({x: ROOM_SIZE*0.25, y: ROOM_SIZE*0.25, w: 60, h: 20});
+            this.walls.push({x: ROOM_SIZE*0.75 - 60, y: ROOM_SIZE*0.25, w: 60, h: 20});
+            this.walls.push({x: ROOM_SIZE*0.25, y: ROOM_SIZE*0.75 - 20, w: 60, h: 20});
+            this.walls.push({x: ROOM_SIZE*0.75 - 60, y: ROOM_SIZE*0.75 - 20, w: 60, h: 20});
+        } else if (this.boss instanceof SamuraiBoss) {
+            // Room 6: Bamboo Forest style - Thin pillars scattered around to block air slashes
+            this.pillars.push({x: ROOM_SIZE*0.25, y: ROOM_SIZE*0.25, r: 15});
+            this.pillars.push({x: ROOM_SIZE*0.75, y: ROOM_SIZE*0.25, r: 15});
+            this.pillars.push({x: ROOM_SIZE*0.25, y: ROOM_SIZE*0.75, r: 15});
+            this.pillars.push({x: ROOM_SIZE*0.75, y: ROOM_SIZE*0.75, r: 15});
+            this.pillars.push({x: ROOM_SIZE*0.5, y: ROOM_SIZE*0.16, r: 15});
+            this.pillars.push({x: ROOM_SIZE*0.5, y: ROOM_SIZE*0.84, r: 15});
+            
+            // Spiky poles specifically for Samurai Fight
+            this.spikes.push({x: ROOM_SIZE*0.5, y: ROOM_SIZE*0.35, r: 20});
+            this.spikes.push({x: ROOM_SIZE*0.5, y: ROOM_SIZE*0.65, r: 20});
+            this.spikes.push({x: ROOM_SIZE*0.35, y: ROOM_SIZE*0.5, r: 20});
+            this.spikes.push({x: ROOM_SIZE*0.65, y: ROOM_SIZE*0.5, r: 20});
+        } else if (this.boss instanceof AdminBoss) {
+            // Room 7: Massive Server Room - 4 giant server racks (blocks)
+            this.walls.push({x: ROOM_SIZE*0.2, y: ROOM_SIZE*0.2, w: 100, h: 100});
+            this.walls.push({x: ROOM_SIZE*0.8 - 100, y: ROOM_SIZE*0.2, w: 100, h: 100});
+            this.walls.push({x: ROOM_SIZE*0.2, y: ROOM_SIZE*0.8 - 100, w: 100, h: 100});
+            this.walls.push({x: ROOM_SIZE*0.8 - 100, y: ROOM_SIZE*0.8 - 100, w: 100, h: 100});
+            
+            // Hidden Dollar Bill in the top right corner
+            this.dollar = { x: ROOM_SIZE - 45, y: 25, w: 18, h: 10, collected: false };
+        } else if (this.boss instanceof LabCoreBoss) {
+            // Room 8: Laboratory Core - pillars for hiding from lasers
+            this.pillars.push({x: 250, y: 250, r: 40});
+            this.pillars.push({x: 550, y: 250, r: 40});
+            this.pillars.push({x: 250, y: 550, r: 40});
+            this.pillars.push({x: 550, y: 550, r: 40});
+        } else if (this.boss instanceof TrueAdminBoss) {
+            // Room 9: Blank 1000x1000 void. No cover. Nowhere to hide.
+        }
+    }
+
+    draw(ctx) {
+        if (this.boss instanceof TutorialDirector) {
+            // Draw a street
+            ctx.fillStyle = '#333'; // Asphalt
+            ctx.fillRect(0, 0, ROOM_SIZE, ROOM_SIZE);
+            ctx.fillStyle = '#2c3e50'; // Sidewalks
+            ctx.fillRect(0, 0, 50, ROOM_SIZE);
+            ctx.fillRect(ROOM_SIZE-50, 0, 50, ROOM_SIZE);
+            // Yellow dashed lines
+            ctx.strokeStyle = '#f1c40f';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(ROOM_SIZE/2, 0);
+            ctx.lineTo(ROOM_SIZE/2, ROOM_SIZE);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else {
+            // Floor pattern normal
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 1;
+            for(let i=0; i<ROOM_SIZE; i+=GRID_CELL_SIZE) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, ROOM_SIZE); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(ROOM_SIZE, i); ctx.stroke();
+            }
+        }
+
+        // Walls
+        ctx.fillStyle = '#444';
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        for (const wall of this.walls) {
+            ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+            ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+        }
+
+        // Pillars
+        ctx.fillStyle = '#555';
+        for (const pillar of this.pillars) {
+            ctx.beginPath();
+            ctx.arc(pillar.x, pillar.y, pillar.r, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // Spikes
+        ctx.fillStyle = '#2c3e50';
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+        for (const spike of this.spikes) {
+            ctx.beginPath();
+            ctx.arc(spike.x, spike.y, spike.r, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw the spiky bits
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI) / 4;
+                const innerX = spike.x + Math.cos(angle) * spike.r;
+                const innerY = spike.y + Math.sin(angle) * spike.r;
+                const outerX = spike.x + Math.cos(angle) * (spike.r + 8);
+                const outerY = spike.y + Math.sin(angle) * (spike.r + 8);
+                ctx.moveTo(innerX, innerY);
+                ctx.lineTo(outerX, outerY);
+            }
+            ctx.stroke();
+        }
+
+        // Portal if cleared
+        if (this.cleared) {
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.5)';
+            ctx.beginPath();
+            ctx.arc(ROOM_SIZE/2, ROOM_SIZE/2, 40, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText("ENTER", ROOM_SIZE/2, ROOM_SIZE/2 + 5);
+        }
+
+        // Draw hidden dollar bill
+        if (this.dollar && !this.dollar.collected) {
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(this.dollar.x, this.dollar.y, this.dollar.w, this.dollar.h);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 8px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('$', this.dollar.x + this.dollar.w/2, this.dollar.y + this.dollar.h/2);
+        }
+    }
+}
+
+/**
+ * Main Game Controller
+ */
+class Game {
+    constructor() {
+        this.telegraphs = [];
+        this.projectiles = [];
+        this.hazards = []; // Ground hazards / DOT
+        this.particles = []; // Visual flair
+        this.collectibles = []; // Health and speed buffs
+        this.roomIndex = 0;
+        this.rooms = [TutorialDirector, RobotBoss, GolemBoss, DragonBoss, NagaBoss, BombGolemBoss, SamuraiBoss, AdminBoss, LabCoreBoss, TrueAdminBoss, null]; 
+        this.setupRoomSize();
+        this.player = new Player(ROOM_SIZE/2, ROOM_SIZE - 50);
+        this.room = new Room(this.rooms[this.roomIndex]);
+        this.lastTime = performance.now();
+        this.state = 'MENU'; // MENU, PLAYING, GAMEOVER, WIN, UPGRADE
+        
+        // Achievement tracking
+        this.runDamaged = false;
+        this.runGlitched = false;
+        this.isGlitchModalOpen = false;
+        this.pendingUpgrades = 0;
+        
+        // Dialogue system state
+        this.dialogueActive = false;
+        this.dialogueQueue = [];
+        this.dialogueCallback = null;
+    }
+
+    spawnParticles(x, y, color, count, speed, life, size) {
+        for (let i = 0; i < count; i++) {
+            this.particles.push(new Particle(x, y, color, speed, life, size));
+        }
+    }
+
+    getRoomDialogue(index) {
+        switch(index) {
+            case 0: return [{speaker: 'Player', text: 'Something feels off...'}];
+            case 1: return [
+                {speaker: 'The Admin', text: 'Applying final patches to the Sentinel...'},
+                {speaker: 'Player', text: 'Shutting you down, Admin!'},
+                {speaker: 'The Admin', text: 'A minor glitch. Sentinel, erase them.'}
+            ];
+            case 2: return [{speaker: 'Player', text: "A giant rock monster. Time to make some gravel."}];
+            case 3: return [{speaker: 'Player', text: 'A dragon? In a mainframe?'}];
+            case 4: return [{speaker: 'Player', text: 'Venomous. I need to keep my distance.'}];
+            case 5: return [{speaker: 'Player', text: "Walking ordnance. One wrong move and I'm done."}];
+            case 6: return [{speaker: 'Player', text: 'Fast. I need to watch their blade.'}];
+            case 7: return [
+                {speaker: 'Player', text: 'Where are they?!'},
+                {speaker: 'The Admin', text: 'Welcome to the core.'},
+                {speaker: 'The Admin', text: "I've been monitoring your progress..."},
+                {speaker: 'The Admin', text: "But your search ends here."},
+                {speaker: 'The Admin', text: "You will be deleted."},
+                {speaker: 'Player', text: "We'll see about that."}
+            ];
+            case 8: return [
+                {speaker: 'Player', text: 'The main laboratory. They have to be here.'},
+                {speaker: 'Lab Core', text: 'UNAUTHORIZED ACCESS. INITIATING PURGE.'}
+            ];
+            case 9: return [
+                {speaker: 'The Admin (True Form)', text: 'YOU SURVIVED.'},
+                {speaker: 'The Admin (True Form)', text: 'BUT I AM NO LONGER CONSTRAINED BY THAT SHELL.'},
+                {speaker: 'Player', text: 'This ends now.'},
+                {speaker: 'The Admin (True Form)', text: 'WE SHALL SEE.'}
+            ];
+            default: return [];
+        }
+    }
+
+    playDialogue(lines, onComplete = null) {
+        this.dialogueQueue = [...lines];
+        this.dialogueCallback = onComplete;
+        this.dialogueActive = true;
+        this.advanceDialogue();
+    }
+
+    getSpeakerColor(speaker) {
+        if (speaker === 'Player') return '#3498db';
+        if (speaker === 'Friend') return '#ffb8b8';
+        if (speaker === 'The Admin (Phase 2)' || speaker === 'The Admin (True Form)') return '#ff0000';
+        if (speaker.includes('Admin')) return '#00ff00';
+        if (speaker === 'System' || speaker === 'Lab Core') return '#f1c40f';
+        if (speaker === 'Mysterious Person') return '#8e44ad';
+        return '#fff';
+    }
+
+    advanceDialogue() {
+        if (this.dialogueQueue.length > 0) {
+            const line = this.dialogueQueue.shift();
+            const box = document.getElementById('dialogue-container');
+            const speakerElem = document.getElementById('dialogue-speaker');
+            
+            speakerElem.innerText = line.speaker;
+            speakerElem.style.color = this.getSpeakerColor(line.speaker);
+            document.getElementById('dialogue-text').innerText = line.text;
+            box.classList.remove('hidden');
+        } else {
+            document.getElementById('dialogue-container').classList.add('hidden');
+            this.dialogueActive = false;
+            
+            // Clear inputs so we don't accidentally dash or shoot right after dialog closes
+            mouse.down = false;
+            mouse.rightDown = false;
+            keys[' '] = false;
+            
+            if (this.dialogueCallback) this.dialogueCallback();
+        }
+    }
+
+    setupRoomSize() {
+        if (this.rooms[this.roomIndex] === RobotBoss || this.rooms[this.roomIndex] === LabCoreBoss) {
+            setRoomSize(800);
+        } else if (this.rooms[this.roomIndex] === AdminBoss || this.rooms[this.roomIndex] === TrueAdminBoss) {
+            setRoomSize(1000); // Admin Arena is huge
+        } else {
+            setRoomSize(600);
+        }
+    }
+
+    start() {
+        document.getElementById('overlay').classList.add('hidden');
+        document.getElementById('achievements-btn').classList.add('hidden');
+        document.getElementById('fake-ad').classList.add('hidden');
+        this.player.hasWeapon = false; // Reset to false for fresh game starts
+        this.collectibles = [];
+        
+        this.state = 'PLAYING';
+        this.lastTime = performance.now();
+        requestAnimationFrame((t) => this.loop(t));
+        
+        const introLines = this.getRoomDialogue(this.roomIndex);
+        if (introLines.length > 0) this.playDialogue(introLines);
+    }
+
+    startBonusRoom() {
+        // Initializes the game specifically for the Bonus Boss mode
+        document.getElementById('overlay').classList.add('hidden');
+        document.getElementById('achievements-btn').classList.add('hidden');
+        document.getElementById('fake-ad').classList.add('hidden');
+        
+        this.roomIndex = 9; // TrueAdminBoss
+        this.setupRoomSize();
+        this.room = new Room(this.rooms[this.roomIndex]);
+        
+        // Grant "Awakened State" buffs
+        this.player.maxHp = 2500;
+        this.player.hp = 2500;
+        this.player.speed = 350;
+        this.player.baseDamage = 50;
+        this.player.weapon = 'god_gun';
+        this.player.fireRate = 0.05;
+        this.player.hasWeapon = true;
+        this.player.x = ROOM_SIZE/2;
+        this.player.y = ROOM_SIZE - 50;
+        
+        this.telegraphs = [];
+        this.projectiles = [];
+        this.hazards = [];
+        this.particles = [];
+        this.collectibles = [];
+        
+        this.state = 'PLAYING';
+        document.getElementById('boss-health').classList.remove('hidden');
+        this.player.takeDamage(0); // Update UI visuals
+        
+        this.lastTime = performance.now();
+        requestAnimationFrame((t) => this.loop(t));
+        
+        const introLines = this.getRoomDialogue(this.roomIndex);
+        if (introLines.length > 0) this.playDialogue(introLines);
+    }
+
+    restartCurrentRoom() {
+        // Restart mechanics keeping upgrades and room progress!
+        document.getElementById('fake-ad').classList.add('hidden');
+        this.setupRoomSize();
+        this.room = new Room(this.rooms[this.roomIndex]);
+        this.player.hp = this.player.maxHp / 2; // Respawn with half health
+        this.player.x = ROOM_SIZE/2;
+        this.player.y = ROOM_SIZE - 50;
+        this.player.hasWeapon = (this.roomIndex > 0); // Remove weapon if restarting tutorial
+        
+        // Restore Awakened Buffs if dying in Bonus Room
+        if (this.roomIndex === 9) {
+            this.player.maxHp = 2500; this.player.hp = 2500;
+            this.player.speed = 350; this.player.baseDamage = 50;
+            this.player.weapon = 'god_gun'; this.player.fireRate = 0.05;
+            this.player.hasWeapon = true;
+        }
+        
+        this.telegraphs = [];
+        this.projectiles = [];
+        this.hazards = [];
+        this.particles = [];
+        this.collectibles = [];
+        
+        this.state = 'PLAYING';
+        document.getElementById('overlay').classList.add('hidden');
+        document.getElementById('boss-health').classList.remove('hidden');
+        this.player.takeDamage(0); // Update UI visuals
+        
+        this.lastTime = performance.now();
+        requestAnimationFrame((t) => this.loop(t));
+        
+        const introLines = this.getRoomDialogue(this.roomIndex);
+        if (introLines.length > 0) this.playDialogue(introLines);
+    }
+
+    roomCleared() {
+        this.telegraphs = [];
+        this.projectiles = [];
+        this.hazards = [];
+        this.collectibles = [];
+        this.room.cleared = true;
+        if (this.rooms[this.roomIndex] === RobotBoss) unlockAchievement('first_blood');
+    }
+
+    showUpgrades() {
+        this.state = 'UPGRADE';
+        const screen = document.getElementById('upgrade-screen');
+        const container = screen.querySelector('.upgrade-options');
+        const title = screen.querySelector('h1');
+        
+        if (this.pendingUpgrades > 1) {
+            title.innerText = "Room Cleared! (Pick 2)";
+        } else if (this.roomIndex === 4 && this.pendingUpgrades === 1) {
+            title.innerText = "Bonus Upgrade!";
+        } else {
+            title.innerText = "Room Cleared!";
+        }
+        
+        container.innerHTML = '';
+        
+        const upgrades = [
+            { id: 'hp', title: '+ Max HP', desc: 'Increases Max HP by 50<br>and heals fully.' },
+            { id: 'dmg', title: '+ Damage', desc: 'Increases attack<br>damage by 5.' },
+            { id: 'spd', title: '+ Speed', desc: 'Increases movement<br>speed by 15%.' },
+            { id: 'firerate', title: '+ Fire Rate', desc: 'Shoot 20% faster.' }
+        ];
+        
+        upgrades.sort(() => Math.random() - 0.5);
+        const selectedUpgrades = upgrades.slice(0, 2);
+        
+        let gunId = 'shotgun';
+        const r = Math.random();
+        if (r < 0.1) gunId = 'laser';
+        else if (r < 0.4) gunId = 'rocket';
+        else if (r < 0.75) gunId = 'minigun';
+        
+        const guns = {
+            'shotgun': { title: 'Gun: Shotgun', desc: 'Fires a spread<br>of 5 bullets.' },
+            'minigun': { title: 'Gun: Minigun', desc: 'Extremely high fire<br>rate, slight spread.' },
+            'laser': { title: 'Gun: Laser', desc: 'RARE!<br>Fires a fast, 200/s beam.' },
+            'rocket': { title: 'Gun: Rocket Launcher', desc: 'Fires explosives that<br>detonate on impact.' }
+        };
+        
+        const selectedGun = { id: gunId, title: guns[gunId].title, desc: guns[gunId].desc };
+        
+        const choices = [...selectedUpgrades, selectedGun];
+        choices.sort(() => Math.random() - 0.5); // Shuffle them visually
+        
+        choices.forEach(choice => {
+            const card = document.createElement('div');
+            card.className = 'upgrade-card';
+            if (['shotgun', 'minigun', 'laser', 'rocket'].includes(choice.id)) {
+                 card.style.borderColor = '#e74c3c'; // Highlight gun option
+            }
+            card.onclick = () => this.applyUpgrade(choice.id);
+            card.innerHTML = `<h3>${choice.title}</h3><p>${choice.desc}</p>`;
+            container.appendChild(card);
+        });
+        
+        screen.classList.remove('hidden');
+    }
+
+    applyUpgrade(type) {
+        if (type === 'hp') {
+            this.player.maxHp += 50;
+            this.player.hp = this.player.maxHp;
+        } else if (type === 'dmg') {
+            this.player.baseDamage += 5;
+        } else if (type === 'spd') {
+            this.player.speed *= 1.15;
+        } else if (type === 'firerate') {
+            this.player.fireRate *= 0.8;
+        } else if (['shotgun', 'minigun', 'laser', 'rocket'].includes(type)) {
+            this.player.weapon = type;
+        }
+        
+        this.player.takeDamage(0); // Update UI
+        
+        this.pendingUpgrades--;
+        if (this.pendingUpgrades > 0) {
+            this.showUpgrades();
+        } else {
+            document.getElementById('upgrade-screen').classList.add('hidden');
+            if (this.room.cleared) {
+                this.nextRoom();
+            } else {
+                // Resume play for mid-room upgrades (Admin Phase 2)
+                this.state = 'PLAYING';
+                this.lastTime = performance.now();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+    }
+
+    nextRoom() {
+        this.roomIndex++;
+        if (this.rooms[this.roomIndex]) {
+            this.setupRoomSize();
+            this.room = new Room(this.rooms[this.roomIndex]);
+            this.player.x = ROOM_SIZE/2;
+            this.player.y = ROOM_SIZE - 50;
+            // Unpause the game Loop
+            this.state = 'PLAYING';
+            this.lastTime = performance.now();
+            requestAnimationFrame((t) => this.loop(t));
+            
+            const introLines = this.getRoomDialogue(this.roomIndex);
+            if (introLines.length > 0) this.playDialogue(introLines);
+        }
+    }
+
+    gameOver(won) {
+        this.state = won ? 'WIN' : 'GAMEOVER';
+        const overlay = document.getElementById('overlay');
+        overlay.classList.remove('hidden');
+        document.getElementById('overlay-title').innerText = won ? "Victory!" : "You Died";
+        
+        // Let the player know they restart at the checkpoint instead of starting over completely
+        document.getElementById('overlay-desc').innerText = won ? "You defeated all the bosses!" : "You will respawn at the start of the current room.";
+        
+        const btn = document.getElementById('start-btn');
+        btn.innerText = "Restart Checkpoint";
+        document.getElementById('boss-health').classList.add('hidden');
+        document.getElementById('achievements-btn').classList.remove('hidden');
+    }
+
+    gameWin() {
+        if (this.roomIndex === 8) {
+            unlockAchievement('god_slayer'); // Main game win
+            act1Completions++;
+            document.getElementById('comp-count').innerText = act1Completions;
+        }
+        if (!this.runDamaged && !this.runGlitched) {
+            unlockAchievement('admins_vanguard');
+        }
+        this.gameOver(true);
+    }
+
+    loop(currentTime) {
+        if (this.state !== 'PLAYING') return;
+
+        const dt = Math.min((currentTime - this.lastTime) / 1000, 0.1); // cap dt
+        this.lastTime = currentTime;
+
+        // ONLY DO LOGIC IF WE ARE NOT IN DIALOGUE OR GLITCH MODAL (Pause Effect)
+        if (!this.dialogueActive && !this.isGlitchModalOpen) {
+            this.player.update(dt, this.room);
+            
+            if (this.room.boss) {
+                this.room.boss.update(dt, this.player);
+            }
+
+            // Portal transition (Notice that roomIndex < length - 2 captures tutorial too!)
+            if (this.room.cleared && MathUtils.dist(this.player.x, this.player.y, ROOM_SIZE/2, ROOM_SIZE/2) < 40) {
+                if (this.roomIndex === 8) { // Beat Lab Core (Main game win)
+                    this.gameWin();
+                } else if (this.roomIndex === 9) { // Beat True Admin
+                    unlockAchievement('true_god_slayer');
+                    this.gameWin();
+                } else if (this.roomIndex < this.rooms.length - 2) {
+                    this.pendingUpgrades = (this.roomIndex === 4) ? 2 : 1; // Naga drops 2 upgrades
+                    this.showUpgrades();
+                    // Move player away from portal to prevent accidental instant double trigger
+                    this.player.x = 0;
+                }
+            }
+
+            this.telegraphs = this.telegraphs.filter(t => !t.update(dt, this.player));
+            
+            this.projectiles.forEach(p => p.update(dt, this.room));
+            this.projectiles = this.projectiles.filter(p => p.active);
+
+            this.hazards = this.hazards.filter(h => h.update(dt, this.player));
+            
+            this.collectibles = this.collectibles.filter(c => c.update(dt, this.player));
+            
+            this.particles.forEach(p => p.update(dt));
+            this.particles = this.particles.filter(p => p.life > 0);
+        }
+
+        // Render (Always occurs even if paused)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        this.room.draw(ctx);
+        this.collectibles.forEach(c => c.draw(ctx));
+        this.hazards.forEach(h => h.draw(ctx)); // Draw hazards under entities
+        this.telegraphs.forEach(t => t.draw(ctx));
+        if (this.room.boss) this.room.boss.draw(ctx);
+        this.projectiles.forEach(p => p.draw(ctx));
+        this.particles.forEach(p => p.draw(ctx));
+        this.player.draw(ctx);
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+}
+
+// Init
+game = new Game();
+window.stackBugEnabled = false;
+renderAchievements();
+if (achievements.god_slayer.unlocked) document.getElementById('bonus-btn').classList.remove('hidden');
+
+let bugClickCount = 0;
+let bugClickTimer = null;
+
+const bugToggleBtn = document.getElementById('bug-toggle');
+if (bugToggleBtn) {
+    bugToggleBtn.addEventListener('click', (e) => {
+        bugClickCount++;
+        clearTimeout(bugClickTimer);
+        
+        // Reset click count if not clicked fast enough
+        bugClickTimer = setTimeout(() => { bugClickCount = 0; }, 1000);
+
+        if (bugClickCount >= 5) {
+            window.stackBugEnabled = !window.stackBugEnabled;
+            bugClickCount = 0; // reset
+            
+            // Show notification since the button is invisible
+            const toast = document.getElementById('toast');
+            toast.innerText = window.stackBugEnabled ? "⚠️ System Glitch Enabled (Stack Bug)" : "System Glitch Disabled";
+            toast.style.background = window.stackBugEnabled ? "#8e44ad" : "#e74c3c";
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.style.background = "#2ecc71"; // revert to default green for achievements
+            }, 3000);
+
+            if (window.stackBugEnabled) {
+                unlockAchievement('hacker');
+                if (game) game.runGlitched = true;
+            }
+
+            // Clear debt immediately if toggled off so it doesn't fire a burst unexpectedly
+            if (!window.stackBugEnabled && game && game.player) {
+                game.player.fireCooldown = 0;
+            }
+        }
+    });
+}
+
+// Glitch Password Submission Handlers
+document.getElementById('submit-password').addEventListener('click', () => {
+    const pwd = document.getElementById('glitch-password').value;
+    const toast = document.getElementById('toast');
+    
+    if (pwd === '1234') {
+        window.stackBugEnabled = true;
+        toast.innerText = "⚠️ SYSTEM OVERRIDE SUCCESSFUL (Stack Bug Enabled)";
+        toast.style.background = "#8e44ad";
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.style.background = "#2ecc71"; // revert to default green
+        }, 3000);
+
+        unlockAchievement('hacker');
+        if (game) game.runGlitched = true;
+    } else {
+        toast.innerText = "ACCESS DENIED. Sequence reset.";
+        toast.style.background = "#e74c3c";
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.style.background = "#2ecc71";
+        }, 2000);
+        // Reset locks so they have to redo the CPS challenge
+        glitchUnlocked.TL = glitchUnlocked.TR = glitchUnlocked.BL = glitchUnlocked.BR = false;
+        glitchCorners.TL = []; glitchCorners.TR = []; glitchCorners.BL = []; glitchCorners.BR = [];
+    }
+    
+    document.getElementById('password-modal').classList.add('hidden');
+    if (game) {
+        game.isGlitchModalOpen = false;
+        game.lastTime = performance.now(); // Prevent large delta-time skip from pause
+    }
+});
+
+document.getElementById('cancel-password').addEventListener('click', () => {
+    document.getElementById('password-modal').classList.add('hidden');
+    // Reset locks if aborted
+    glitchUnlocked.TL = glitchUnlocked.TR = glitchUnlocked.BL = glitchUnlocked.BR = false;
+    glitchCorners.TL = []; glitchCorners.TR = []; glitchCorners.BL = []; glitchCorners.BR = [];
+    
+    if (game) {
+        game.isGlitchModalOpen = false;
+        game.lastTime = performance.now();
+    }
+});
+
+document.getElementById('glitch-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('submit-password').click();
+});
+
+document.getElementById('close-ad').addEventListener('click', () => {
+    document.getElementById('fake-ad').classList.add('hidden');
+    unlockAchievement('ad_blocker');
+});
+
+document.getElementById('achievements-btn').addEventListener('click', () => {
+    document.getElementById('overlay').classList.add('hidden');
+    document.getElementById('achievements-screen').classList.remove('hidden');
+    renderAchievements();
+});
+
+document.getElementById('close-achiev-popup').addEventListener('click', () => {
+    document.getElementById('achiev-popup').classList.add('hidden');
+});
+
+document.getElementById('back-menu-btn').addEventListener('click', () => {
+    document.getElementById('achievements-screen').classList.add('hidden');
+    document.getElementById('achiev-popup').classList.add('hidden');
+    document.getElementById('overlay').classList.remove('hidden');
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    if (game.state === 'WIN') {
+        game = new Game(); // Full game restart if they win and want to play again
+        game.start();
+    } else if (game.state === 'GAMEOVER') {
+        game.restartCurrentRoom(); // Checkpoint Restart
+    } else {
+        game.start();
+    }
+    document.getElementById('achievements-btn').classList.add('hidden');
+    document.getElementById('bonus-btn').classList.add('hidden');
+});
+
+document.getElementById('bonus-btn').addEventListener('click', () => {
+    game = new Game(); // Fresh instance
+    game.startBonusRoom();
+    document.getElementById('achievements-btn').classList.add('hidden');
+    document.getElementById('bonus-btn').classList.add('hidden');
+});
+
+// Save / Load System
+document.getElementById('save-btn').addEventListener('click', () => {
+    const saveData = {
+        achievements: achievements,
+        stackBugEnabled: window.stackBugEnabled,
+        act1Completions: act1Completions
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(saveData));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "aoe_boss_rush_save.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    
+    const toast = document.getElementById('toast');
+    toast.innerText = "Progress Saved!";
+    toast.style.background = "#27ae60";
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 2000);
+});
+
+document.getElementById('load-file').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const loadedData = JSON.parse(e.target.result);
+            if (loadedData.achievements) {
+                for (let key in loadedData.achievements) {
+                    if (achievements[key] && loadedData.achievements[key].unlocked) {
+                        achievements[key].unlocked = true;
+                    }
+                }
+            }
+            if (loadedData.stackBugEnabled) {
+                window.stackBugEnabled = true;
+            }
+            if (loadedData.act1Completions !== undefined) {
+                act1Completions = loadedData.act1Completions;
+                document.getElementById('comp-count').innerText = act1Completions;
+            }
+            renderAchievements();
+            if (achievements.god_slayer.unlocked) {
+                document.getElementById('bonus-btn').classList.remove('hidden');
+            }
+            
+            const toast = document.getElementById('toast');
+            toast.innerText = "Progress Loaded!";
+            toast.style.background = "#8e44ad";
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.style.background = "#2ecc71"; // Reset color
+            }, 2000);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to load save file. It might be corrupted.");
+        }
+        // Reset the input so the same file can be loaded again if needed
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+});
+
+</script>
+</body>
+</html>
+
